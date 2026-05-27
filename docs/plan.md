@@ -80,6 +80,22 @@ Stage 2: Re-ranking (slow, precise)
 - **Contextual embedding (ColBERT/Late interaction):** Giữ 1 vector per token, tính relevance qua MaxSim. Chính xác hơn nhưng storage lớn hơn 100x.
 - **Decision:** Dùng sentence embedding (bi-encoder) cho retrieval + cross-encoder cho reranking = balance tốt nhất.
 
+**Embedding Input Strategy: Raw chunk text only (no metadata prefix)**
+
+We considered two approaches:
+- **(A) Raw text only:** Embed the chunk content as-is.
+- **(B) Metadata-enriched:** Prepend structured metadata (e.g., `"Speakers: X, Y | {text}"`) before encoding.
+
+**Decision: (A) Raw text only.** Rationale:
+
+1. **Separation of concerns in hybrid architecture.** Our system already handles metadata through dedicated mechanisms: ES structured fields for filtering (speaker, date, meeting_id) and BM25 for keyword matching on those fields. The dense vector's role is purely semantic similarity on *content meaning*. Mixing responsibilities into a single 384-dim vector creates coupling that is harder to evaluate and debug.
+
+2. **Embedding capacity constraint.** At 384 dimensions (`all-MiniLM-L6-v2`), the vector space has limited capacity to encode information. Metadata tokens like speaker IDs (e.g., "MEO069") carry no semantic meaning — they consume model attention and embedding capacity without contributing to content similarity. This dilutes the signal for the queries that genuinely require semantic understanding (e.g., "discussions about budget constraints").
+
+3. **Evaluation isolation.** The project requires evaluating content search and metadata search independently. Embedding raw text keeps the semantic retrieval channel pure, allowing clean ablation studies: BM25-only vs kNN-only vs hybrid. If metadata were baked into embeddings, we could not isolate the contribution of each retrieval signal.
+
+4. **RRF handles the fusion.** Reciprocal Rank Fusion merges results from BM25 (which already captures metadata matches) and kNN (semantic content) without requiring either to be aware of the other. This is the designed integration point — not the embedding itself.
+
 ### 3. Hybrid Search Architecture (Elasticsearch 8.x)
 
 ```
