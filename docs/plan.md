@@ -143,6 +143,32 @@ We considered two approaches:
 
 **RRF Formula:** `score = Σ 1/(k + rank_i)` where k=60 (standard).
 
+**Reranking Strategy: Multi-tier configurable reranking**
+
+Reranking is the second stage that refines the top-N candidates from hybrid retrieval by scoring each (query, document) pair with full cross-attention. We evaluated the following options:
+
+| Model | Params | Latency (50 docs, CPU) | BEIR NDCG@10 | Notes |
+|-------|--------|----------------------|-------------|-------|
+| ms-marco-MiniLM-L6-v2 | 22M | ~200-400ms | ~52 | Baseline cross-encoder |
+| FlashRank (ONNX MiniLM) | 22M | ~36ms | ~52 | Same model, ONNX optimized, 5-10x faster |
+| BGE-reranker-v2-m3 | 568M | ~800-1200ms | ~57 | High accuracy, too slow on CPU |
+| Jina-reranker-v2 | 137M | ~150-300ms | ~58 | Best accuracy/speed ratio |
+| Jina-reranker-v3 | ~400M | ~400-600ms | 61.94 | SOTA but heavier |
+| LLM-based (listwise) | >1B | ~2-5s | Highest | Impractical for <500ms budget |
+
+**Decision: Configurable multi-tier approach.** The system supports multiple reranking backends selectable via API parameter. This enables:
+- Fair benchmarking across methods in evaluation (Task 9)
+- Latency/quality tradeoff at query time
+- All options remain within <500ms total latency budget
+
+Candidate configurations for experiments:
+- `rerank=none` — RRF scores only (~20ms total)
+- `rerank=flash` — FlashRank ONNX (~56ms total)
+- `rerank=cross-encoder` — ms-marco-MiniLM-L6-v2 (~300ms total)
+- `rerank=jina` — Jina-reranker-v2 (~250ms total)
+
+Final model selection will be determined by Task 9 experiment results on our meeting corpus.
+
 ### 4. Data & Chunking Strategy
 
 **Datasets:**
