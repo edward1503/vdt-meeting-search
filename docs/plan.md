@@ -129,20 +129,36 @@ Stage 2: Re-ranking (slow, precise)
 
 ### 4. Data & Chunking Strategy
 
-**AMI Meeting Corpus (HuggingFace: `edinburghcstr/ami`):**
-- 137 meetings, ~109K utterances (train)
-- Fields: `meeting_id`, `text`, `speaker_id`, `begin_time`, `end_time`
-- Supplementary: `knkarthick/AMI` có summaries (137 rows)
+**Datasets:**
+- AMI (`edinburghcstr/ami`, config `ihm`): 137 meetings, ~109K utterances, fields: `meeting_id`, `text`, `speaker_id`, `begin_time`, `end_time`
+- ICSI (`StDestiny/icsi_cleaned`): 59 meetings, fields: `src` (dialogue), `tgt` (summary)
+- QMSum (`pszemraj/qmsum-cleaned`): 232 meetings, 1,808 query-summary pairs, fields: `input` (query + dialogue), `output` (summary)
 
-**Chunking cho meeting transcripts:**
-- **Strategy:** Speaker-turn based chunking với sliding window
-- **Chunk size:** 256-512 tokens (sweet spot cho retrieval)
-- **Overlap:** 20% (~50-100 tokens)
-- **Đặc thù dialogue:** Group consecutive turns từ cùng speaker, hoặc group theo topic segment
+**Chunking Strategy: Speaker-turn grouping with sliding window fallback (Method B)**
 
-**2-level indexing:**
-- **Document level:** Toàn bộ meeting (metadata + summary) → tìm meeting nào relevant
-- **Passage level:** Chunks trong meeting → highlight đoạn nào relevant
+We evaluated two approaches:
+
+| Criteria | A: Fixed sliding window | B: Speaker-turn + fallback |
+|----------|------------------------|---------------------------|
+| Semantic coherence | ❌ Cuts mid-sentence/speaker | ✅ Preserves speaker boundaries |
+| Speaker attribution | ❌ Mixed speakers per chunk | ✅ Clear speaker metadata |
+| Supports "who said X" queries | ❌ No | ✅ Yes |
+| Chunk size consistency | ✅ Uniform 512 tokens | ⚠️ Variable, needs min/max bounds |
+| Implementation complexity | ✅ Simple | ⚠️ Moderate |
+| Embedding quality | ⚠️ Random boundaries dilute signal | ✅ Natural semantic units |
+
+**Why Method B:** Meeting transcripts are dialogue — speaker changes often correlate with topic shifts. Fixed-size chunking blindly cuts across these boundaries, producing chunks with mixed speakers and split sentences. This hurts both retrieval precision (diluted semantic signal) and the highlight feature (can't attribute text to speakers). Method B preserves natural conversation units while maintaining chunk sizes suitable for embedding models.
+
+**Algorithm:**
+1. Merge consecutive utterances from same speaker into one block
+2. If merged block < 200 tokens → merge with next speaker block (retain both speaker IDs)
+3. If merged block > 512 tokens → apply sliding window (512 tokens, 100 token overlap)
+4. Each chunk stores: `meeting_id`, `speakers[]`, `time_start`, `time_end`, `text`
+
+**Indexing: Single-level with meeting grouping**
+- Index chunks (passage-level) with meeting metadata as fields on each chunk
+- Group results by `meeting_id` in response to show per-meeting results
+- Simpler than two-level, and passage-level is needed for highlighting anyway
 
 ### 5. Evaluation Strategy
 
