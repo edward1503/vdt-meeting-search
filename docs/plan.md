@@ -256,14 +256,26 @@ Stage 2: Re-ranking (slow, precise)
 
 ### Task 9: Experiment Comparison & Optimization
 
-- **Objective:** Chạy experiments so sánh các cấu hình
+- **Objective:** Chạy experiments so sánh các cấu hình, bao gồm đánh giá TurboVec (TurboQuant, ICLR 2026) như một alternative vector search backend
 - **Implementation:**
   - Embedding model comparison (MiniLM vs mpnet)
   - Chunk size (256 vs 512)
   - With/without reranker
   - RRF k parameter tuning
   - Latency benchmarking (p50, p95, p99)
+  - **TurboVec experimental comparison:**
+    - Install `turbovec` as vector index backend
+    - Build TurboVec index (IdMapIndex, dim=384, bit_width=4 and bit_width=2)
+    - Compare retrieval backends on same query set:
+      - ES kNN (HNSW, exact at this scale)
+      - TurboVec 4-bit quantization
+      - TurboVec 2-bit quantization
+      - Brute-force exact search (baseline)
+    - Measure: Recall@K vs exact, query latency, memory usage, index build time
+    - Evaluate TurboVec filtered search (allowlist from BM25 candidates) as hybrid approach
+    - Analyze TurboQuant behavior at low-dim (d=384) vs paper's high-dim results
 - **Test:** All experiments produce valid metrics and charts
+- **Report section:** "Evaluation of TurboQuant for low-dimensional meeting embeddings" — contributes empirical data at d=384 where few benchmarks exist
 
 ### Task 10: Demo Frontend UI
 

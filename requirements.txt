@@ -8,3 +8,4 @@ pydantic-settings==2.5.2
 datasets==2.21.0
 numpy==1.26.4
 tqdm==4.66.5
+turbovec==0.3.0
