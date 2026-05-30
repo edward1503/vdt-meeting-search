@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VDT Meeting Search — Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, "Segoe UI", Arial, sans-serif; margin: 0; background: #f4f6f8; color: #1a2027; }
+    header { background: #0b5394; color: #fff; padding: 16px 24px; }
+    header h1 { margin: 0; font-size: 18px; }
+    .searchbar { display: flex; gap: 8px; padding: 16px 24px; background: #fff; border-bottom: 1px solid #e0e4e8; }
+    .searchbar input[type=text] { flex: 1; padding: 10px 12px; font-size: 15px; border: 1px solid #c4ccd4; border-radius: 6px; }
+    .searchbar select, .searchbar button { padding: 10px 14px; font-size: 14px; border-radius: 6px; border: 1px solid #c4ccd4; background: #fff; cursor: pointer; }
+    .searchbar button { background: #0b5394; color: #fff; border: none; }
+    .parsed { padding: 8px 24px; font-size: 13px; color: #4a5660; background: #eef3f8; min-height: 18px; }
+    .parsed .chip { display: inline-block; background: #d6e4f0; color: #0b5394; border-radius: 12px; padding: 2px 10px; margin-right: 6px; }
+    .layout { display: flex; gap: 16px; padding: 16px 24px; }
+    .sidebar { width: 220px; flex-shrink: 0; background: #fff; border: 1px solid #e0e4e8; border-radius: 8px; padding: 16px; height: fit-content; }
+    .sidebar h3 { font-size: 13px; text-transform: uppercase; color: #6b7680; margin: 0 0 8px; }
+    .sidebar label { display: block; font-size: 14px; margin: 4px 0; }
+    .sidebar input[type=text] { width: 100%; padding: 6px 8px; border: 1px solid #c4ccd4; border-radius: 4px; margin-bottom: 12px; }
+    .sidebar .row { display: flex; gap: 6px; }
+    .sidebar .row input { width: 50%; }
+    .results { flex: 1; }
+    .status { color: #6b7680; font-size: 14px; margin-bottom: 12px; }
+    .card { background: #fff; border: 1px solid #e0e4e8; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .card-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .card-head .title { font-size: 16px; font-weight: 600; color: #0b5394; }
+    .badge { font-size: 12px; background: #eef3f8; color: #4a5660; border-radius: 10px; padding: 2px 8px; margin-left: 6px; }
+    .meta { font-size: 13px; color: #4a5660; margin: 6px 0 10px; }
+    .evidence { font-size: 14px; line-height: 1.5; border-left: 3px solid #d6e4f0; padding: 4px 0 4px 12px; margin: 8px 0; color: #2a3540; }
+    .evidence .who { color: #6b7680; font-size: 12px; }
+    mark { background: #fff3a3; padding: 0 2px; }
+  </style>
+</head>
+<body>
+  <header><h1>🔎 VDT Meeting Search — Demo tìm kiếm ngữ nghĩa biên bản cuộc họp</h1></header>
+
+  <div class="searchbar">
+    <input id="q" type="text" placeholder="Nhập prompt tự nhiên, vd: cuộc họp AMI có MEO069 bàn về interface design năm 2005" />
+    <select id="mode" title="Chế độ tìm kiếm">
+      <option value="hybrid">hybrid</option>
+      <option value="semantic">semantic</option>
+      <option value="bm25">bm25</option>
+    </select>
+    <button id="go">Tìm</button>
+  </div>
+  <div class="parsed" id="parsed">Hệ thống sẽ tự tách điều kiện (nguồn · người · thời gian) từ prompt.</div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <h3>Bộ lọc</h3>
+      <label><input type="checkbox" id="f_qmsum" value="qmsum" /> qmsum</label>
+      <label><input type="checkbox" id="f_ami" value="ami" /> ami</label>
+      <h3 style="margin-top:14px">Người</h3>
+      <input id="f_speaker" type="text" placeholder="vd: MEO069" />
+      <h3>Thời gian (năm)</h3>
+      <div class="row"><input id="f_from" type="text" placeholder="từ 2005" /><input id="f_to" type="text" placeholder="đến 2005" /></div>
+    </aside>
+
+    <main class="results">
+      <div class="status" id="status">Nhập prompt và bấm Tìm.</div>
+      <div id="cards"></div>
+    </main>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    // Escape toàn bộ HTML rồi chỉ phục hồi thẻ <em>...</em> mà Elasticsearch trả về (chống XSS).
+    function renderHighlight(fragment) {
+      const esc = fragment
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return esc.replace(/&lt;em&gt;/g, "<mark>").replace(/&lt;\/em&gt;/g, "</mark>");
+    }
+    function escapeText(s) {
+      return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function buildRequest() {
+      const sources = [];
+      if ($("f_qmsum").checked) sources.push("qmsum");
+      if ($("f_ami").checked) sources.push("ami");
+      const body = {
+        query: $("q").value.trim(),
+        mode: $("mode").value,
+        top_k: 10,
+        parse_prompt: true,
+      };
+      // Filter sidebar override (lọc mềm có thể override bằng tay).
+      if (sources.length === 1) body.source = sources[0];
+      const sp = $("f_speaker").value.trim();
+      if (sp) body.speaker = sp;
+      const from = $("f_from").value.trim(), to = $("f_to").value.trim();
+      if (from && to) body.date_range = [from + "-01-01", to + "-12-31"];
+      return body;
+    }
+
+    async function doSearch() {
+      const body = buildRequest();
+      if (!body.query) { $("status").textContent = "Vui lòng nhập prompt."; return; }
+      $("status").textContent = "Đang tìm...";
+      $("cards").innerHTML = "";
+      try {
+        const res = await fetch("/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        renderParsed(data);
+        renderResults(data);
+      } catch (e) {
+        $("status").textContent = "Lỗi: " + e.message;
+      }
+    }
+
+    function renderParsed(data) {
+      const parsed = data.parsed || [];
+      if (parsed.length === 0) {
+        $("parsed").textContent = "Không tách được điều kiện cụ thể — tìm theo toàn bộ ngữ nghĩa prompt.";
+      } else {
+        $("parsed").innerHTML = "Hiểu được: " + parsed.map(p => `<span class="chip">${escapeText(p)}</span>`).join("");
+      }
+    }
+
+    function renderResults(data) {
+      const results = data.results || [];
+      $("status").textContent = `Tìm thấy ${results.length} biên bản (mode: ${data.mode}).`;
+      const cards = results.map(m => {
+        const parts = (m.participants || []).join(", ");
+        const when = m.date || (m.start_time ? m.start_time : "—");
+        const evidence = (m.evidence || []).map(ev => {
+          const frags = (ev.highlight && ev.highlight.length)
+            ? ev.highlight.map(renderHighlight).join(" … ")
+            : escapeText((ev.text || "").slice(0, 240));
+          const who = (ev.speakers || []).join(", ");
+          return `<div class="evidence">${frags}<div class="who">— ${escapeText(who)}</div></div>`;
+        }).join("");
+        return `<div class="card">
+          <div class="card-head">
+            <span class="title">${escapeText(m.title || m.meeting_id)}</span>
+            <span><span class="badge">${escapeText(m.source || "")}</span><span class="badge">score ${(m.score||0).toFixed(3)}</span></span>
+          </div>
+          <div class="meta">📅 ${escapeText(when)} &nbsp;·&nbsp; 👥 ${escapeText(parts || "—")}</div>
+          ${evidence}
+        </div>`;
+      }).join("");
+      $("cards").innerHTML = cards;
+    }
+
+    $("go").addEventListener("click", doSearch);
+    $("q").addEventListener("keydown", (e) => { if (e.key === "Enter") doSearch(); });
+  </script>
+</body>
+</html>

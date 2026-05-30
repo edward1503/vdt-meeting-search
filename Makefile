@@ -10,7 +10,7 @@ lint: ## Run linter
 	ruff check src/ tests/
 
 test: ## Run tests
-	pytest tests/ --cov=src -v
+	pytest tests/ -v
 
 build: ## Build Docker images
 	docker compose -f docker/docker-compose.yml build

@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 100
     search_top_k: int = 10
+    ingest_api_key: str = "dev-ingest-key"
 
     class Config:
         env_file = ".env"

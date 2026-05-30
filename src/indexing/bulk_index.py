@@ -46,9 +46,53 @@ def create_index(es: Elasticsearch, index_name: str = DEFAULT_INDEX, recreate: b
                     "index": True,
                     "similarity": "cosine",
                 },
+                "metadata_embedding": {
+                    "type": "dense_vector",
+                    "dims": settings.embedding_dim,
+                    "index": True,
+                    "similarity": "cosine",
+                },
             }
         },
     )
+
+
+def index_chunk_docs(
+    es: Elasticsearch,
+    chunks: list[dict],
+    index_name: str = DEFAULT_INDEX,
+    batch_size: int = 64,
+) -> int:
+    """Embed (content + metadata) and bulk-index a list of chunk dicts. Returns count."""
+    total = 0
+    for start in range(0, len(chunks), batch_size):
+        batch = chunks[start:start + batch_size]
+        vectors = embed_texts([chunk["content_text"] for chunk in batch], batch_size=batch_size)
+        meta_vectors = embed_texts([chunk.get("metadata_text") or "" for chunk in batch], batch_size=batch_size)
+        actions = []
+        for chunk, vector, meta_vector in zip(batch, vectors, meta_vectors, strict=True):
+            doc = dict(chunk)
+            doc["content_embedding"] = vector
+            doc["metadata_embedding"] = meta_vector
+            actions.append({
+                "_index": index_name,
+                "_id": chunk["chunk_id"],
+                "_source": doc,
+            })
+        helpers.bulk(es, actions)
+        total += len(actions)
+    return total
+
+
+def delete_meeting(es: Elasticsearch, meeting_id: str, index_name: str = DEFAULT_INDEX) -> int:
+    """Delete all chunks of a meeting. Returns number of deleted documents."""
+    result = es.delete_by_query(
+        index=index_name,
+        query={"term": {"meeting_id": meeting_id}},
+        refresh=True,
+        ignore=[404],
+    )
+    return result.get("deleted", 0)
 
 
 def index_chunks(
@@ -66,22 +110,8 @@ def index_chunks(
     es = Elasticsearch(es_host, request_timeout=60)
     try:
         create_index(es, index_name=index_name, recreate=recreate)
-        total = 0
-        for start in range(0, len(chunks), batch_size):
-            batch = chunks[start:start + batch_size]
-            vectors = embed_texts([chunk["content_text"] for chunk in batch], batch_size=batch_size)
-            actions = []
-            for chunk, vector in zip(batch, vectors, strict=True):
-                doc = dict(chunk)
-                doc["content_embedding"] = vector
-                actions.append({
-                    "_index": index_name,
-                    "_id": chunk["chunk_id"],
-                    "_source": doc,
-                })
-            helpers.bulk(es, actions)
-            total += len(actions)
-            print(f"Indexed {total}/{len(chunks)} chunks into {index_name}")
+        total = index_chunk_docs(es, chunks, index_name=index_name, batch_size=batch_size)
+        print(f"Indexed {total}/{len(chunks)} chunks into {index_name}")
         es.indices.refresh(index=index_name)
         return total
     finally:

@@ -1,4 +1,10 @@
-"""Evaluate meeting-level retrieval on QMSum qrels."""
+"""Evaluate meeting-level retrieval on QMSum qrels.
+
+Hỗ trợ (theo README):
+- Precision@k, Recall@k, MRR, NDCG@k, latency p50/p95.
+- Đánh giá riêng theo nguồn: channel=content vs metadata (NF3).
+- So sánh cấu hình: num_candidates cho kNN (NF5) qua --matrix.
+"""
 
 from __future__ import annotations
 
@@ -22,6 +28,8 @@ def run_eval(
     top_k: int = 10,
     limit: int | None = None,
     source: str | None = "qmsum",
+    channel: str = "content",
+    num_candidates: int | None = None,
 ) -> dict:
     queries = list(read_jsonl(queries_path))
     if limit:
@@ -31,6 +39,7 @@ def run_eval(
         relevant_by_query.setdefault(qrel["query_id"], set()).add(qrel["meeting_id"])
 
     recall_hits = 0
+    precisions = []
     reciprocal_ranks = []
     ndcgs = []
     latencies = []
@@ -47,10 +56,14 @@ def run_eval(
             mode=mode,
             top_k=top_k,
             source=source,
+            channel=channel,
+            num_candidates=num_candidates,
         )
         latencies.append((time.perf_counter() - start) * 1000)
         ranked_ids = [item["meeting_id"] for item in response["results"]]
         evaluated += 1
+        relevant_in_topk = sum(1 for mid in ranked_ids[:top_k] if mid in relevant)
+        precisions.append(relevant_in_topk / top_k)
         hit_rank = next((idx + 1 for idx, mid in enumerate(ranked_ids) if mid in relevant), None)
         if hit_rank:
             recall_hits += 1
@@ -63,14 +76,32 @@ def run_eval(
     latencies_sorted = sorted(latencies)
     return {
         "mode": mode,
+        "channel": channel,
         "top_k": top_k,
         "queries": evaluated,
+        f"precision@{top_k}": sum(precisions) / evaluated if evaluated else 0.0,
         f"recall@{top_k}": recall_hits / evaluated if evaluated else 0.0,
         "mrr": sum(reciprocal_ranks) / evaluated if evaluated else 0.0,
         f"ndcg@{top_k}": sum(ndcgs) / evaluated if evaluated else 0.0,
         "latency_p50_ms": _percentile(latencies_sorted, 50),
         "latency_p95_ms": _percentile(latencies_sorted, 95),
     }
+
+
+def run_matrix(queries_path: Path, qrels_path: Path, **kwargs) -> list[dict]:
+    """So sánh các cấu hình: bm25 / semantic / hybrid + content vs metadata channel."""
+    configs = [
+        {"mode": "bm25", "channel": "content"},
+        {"mode": "semantic", "channel": "content"},
+        {"mode": "hybrid", "channel": "content"},
+        {"mode": "bm25", "channel": "metadata"},
+        {"mode": "semantic", "channel": "metadata"},
+        {"mode": "hybrid", "channel": "metadata"},
+    ]
+    results = []
+    for cfg in configs:
+        results.append(run_eval(queries_path, qrels_path, **cfg, **kwargs))
+    return results
 
 
 def _percentile(values: list[float], percentile: int) -> float | None:
@@ -87,20 +118,33 @@ def main() -> None:
     parser.add_argument("--index", default=DEFAULT_INDEX)
     parser.add_argument("--es-host", default=settings.es_host)
     parser.add_argument("--mode", choices=["bm25", "semantic", "hybrid"], default="hybrid")
+    parser.add_argument("--channel", choices=["content", "metadata"], default="content")
+    parser.add_argument("--num-candidates", type=int, default=None)
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--source", default="qmsum")
+    parser.add_argument("--matrix", action="store_true", help="So sánh tất cả cấu hình mode x channel")
     args = parser.parse_args()
-    print(run_eval(
-        queries_path=args.queries,
-        qrels_path=args.qrels,
+
+    common = dict(
         index_name=args.index,
         es_host=args.es_host,
-        mode=args.mode,
         top_k=args.top_k,
         limit=args.limit,
         source=args.source,
-    ))
+    )
+    if args.matrix:
+        for row in run_matrix(args.queries, args.qrels, num_candidates=args.num_candidates, **common):
+            print(row)
+    else:
+        print(run_eval(
+            queries_path=args.queries,
+            qrels_path=args.qrels,
+            mode=args.mode,
+            channel=args.channel,
+            num_candidates=args.num_candidates,
+            **common,
+        ))
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ services:
       - "8000:8000"
     environment:
       - ES_HOST=http://elasticsearch:9200
+      - INGEST_API_KEY=${INGEST_API_KEY:-dev-ingest-key}
     depends_on:
       elasticsearch:
         condition: service_healthy
