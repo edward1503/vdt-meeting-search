@@ -1,191 +1,145 @@
 # Research — Semantic Search for Meeting Minutes
 
-## 1. Semantic Search & Dense Retrieval
+## 1. Retrieval Approach
 
-**Sparse Retrieval (BM25):** Tìm kiếm dựa trên term frequency — tốt cho exact match, tên riêng, mã số.
+**Sparse (BM25):** term-frequency matching — tốt cho exact match, tên riêng, mã số.
 
-**Dense Retrieval (Bi-encoder):** Encode query và document thành vectors, tìm nearest neighbors — tốt cho semantic similarity, paraphrase, intent matching.
+**Dense (Bi-encoder):** encode query và document thành vectors, tìm nearest neighbors — tốt cho semantic similarity, paraphrase, intent.
 
-**Hybrid:** Kết hợp cả hai qua Reciprocal Rank Fusion (RRF) — cho recall cao hơn 15-30% so với dùng riêng lẻ.
+**Hybrid (chosen):** kết hợp cả hai qua Reciprocal Rank Fusion (RRF). Lexical signal mạnh cho names/IDs/dates; dense signal mạnh cho paraphrase và ngữ nghĩa. RRF gộp hai ranking mà không cần chuẩn hóa score.
 
-**Retrieve & Re-rank Pipeline (2-stage):**
+**RRF Formula:** `score = Σ 1/(k + rank_i)`, k=60.
 
-```
-Stage 1: Retrieval (fast, broad)
-  - BM25 → top 100 keyword matches
-  - kNN → top 100 semantic matches
-  - RRF fusion → top 50 combined
+## 2. Embedding Model
 
-Stage 2: Re-ranking (slow, precise)
-  - Cross-encoder scores (query, doc) pairs
-  - Re-sort top 50 → final top 10
-```
+**Chosen: `all-MiniLM-L6-v2`** (bi-encoder, 384-dim).
+- Chạy tốt trên CPU (~5ms/text), 384-dim tiết kiệm storage.
+- Encode full chunk text thành 1 vector — nhanh, scalable, đủ cho meeting retrieval.
+- Vector được normalize → dot product = cosine similarity.
 
-## 2. Embedding Models
+## 3. Embedding Input & Metadata Representation
 
-| Model | Type | Dim | Speed | Accuracy | Use case |
-|-------|------|-----|-------|----------|----------|
-| **all-MiniLM-L6-v2** | Bi-encoder (sentence) | 384 | ~5ms/text CPU | Good | Production, low resource |
-| all-mpnet-base-v2 | Bi-encoder (sentence) | 768 | ~12ms/text | Better | Higher accuracy needs |
-| intfloat/e5-large-v2 | Bi-encoder (asymmetric) | 1024 | ~25ms/text | Best | SOTA retrieval |
-| ColBERT | Late interaction (contextual) | 128/token | Slower index | Excellent | Fine-grained matching |
+**Decision: embed raw chunk content only.** Metadata được xử lý qua kênh riêng, không trộn vào dense vector.
 
-**Chosen: `all-MiniLM-L6-v2`** — runs well on CPU, 384-dim saves storage, sufficient for benchmarking.
+Lý do:
+1. **Separation of concerns.** ES structured fields lo filtering (speaker, date, source); BM25 lo keyword matching; dense vector chỉ lo semantic similarity trên *nội dung*. Không trộn trách nhiệm vào một vector 384-dim.
+2. **Embedding capacity.** Token metadata như speaker ID ("MEO069") không mang ngữ nghĩa — làm loãng tín hiệu nội dung.
+3. **RRF là điểm tích hợp.** RRF gộp BM25 (bắt metadata/keyword) và kNN (semantic content) mà không cần kênh nào biết kênh kia.
 
-**Sentence Embedding vs Contextual Embedding:**
-
-- **Sentence embedding (Bi-encoder):** Encode full text into 1 vector. Fast, scalable, but loses fine-grained token interactions.
-- **Contextual embedding (ColBERT/Late interaction):** 1 vector per token, relevance via MaxSim. More accurate but 100x storage.
-- **Decision:** Sentence embedding (bi-encoder) for retrieval + cross-encoder for reranking = best balance.
-
-## 3. Embedding Input Strategy
-
-**Decision: (A) Raw chunk text only — no metadata prefix.**
-
-We considered:
-- **(A) Raw text only:** Embed the chunk content as-is.
-- **(B) Metadata-enriched:** Prepend structured metadata (e.g., `"Speakers: X, Y | {text}"`) before encoding.
-
-Rationale for choosing (A):
-
-1. **Separation of concerns in hybrid architecture.** Our system handles metadata through dedicated mechanisms: ES structured fields for filtering (speaker, date, meeting_id) and BM25 for keyword matching. The dense vector's role is purely semantic similarity on *content meaning*. Mixing responsibilities into a single 384-dim vector creates coupling that is harder to evaluate and debug.
-
-2. **Embedding capacity constraint.** At 384 dimensions, the vector space has limited capacity. Metadata tokens like speaker IDs (e.g., "MEO069") carry no semantic meaning — they consume model attention and embedding capacity without contributing to content similarity. This dilutes the signal for queries that require semantic understanding (e.g., "discussions about budget constraints").
-
-3. **Evaluation isolation.** The project requires evaluating content search and metadata search independently. Embedding raw text keeps the semantic retrieval channel pure, allowing clean ablation studies: BM25-only vs kNN-only vs hybrid.
-
-4. **RRF handles the fusion.** Reciprocal Rank Fusion merges results from BM25 (captures metadata matches) and kNN (semantic content) without requiring either to be aware of the other. This is the designed integration point — not the embedding itself.
+Biểu diễn:
+- `content_text`: text passage sạch cho BM25 + highlighting
+- `content_embedding`: dense vector của `content_text`
+- `metadata_text`: dạng text của title, speakers, date, source, topic — cho BM25
+- structured fields: exact filters cho speaker, time range, meeting_id, source
 
 ## 4. Hybrid Search Architecture (Elasticsearch 8.x)
 
+Trước retrieval, một bước query-understanding nhẹ (rule-based) tách prompt thành `semantic_query` + `filters`. Dùng deterministic components: speaker dictionary, date parsing, source/meeting-id matching. Filter confidence thấp **không** áp như hard filter — giữ full prompt cho BM25 và dense retrieval. Điều này giữ prompt search thực dụng mà không cần LLM, và lỗi filter có thể debug tách biệt khỏi ranking.
+
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Query (prompt)                    │
-└─────────────────────┬───────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Embedding Service (FastAPI)                  │
-│         sentence-transformers: all-MiniLM-L6-v2          │
-└─────────────────────┬───────────────────────────────────┘
-                      │ query vector (384-dim)
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Elasticsearch 8.x                            │
-│                                                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │  BM25 Search │  │  kNN Search  │  │Metadata Filter│  │
-│  │  (inverted   │  │  (HNSW index │  │  (structured  │  │
-│  │   index)     │  │   dense_vec) │  │   fields)     │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
-│         │                  │                  │          │
-│         └──────────┬───────┘──────────────────┘          │
-│                    │                                     │
-│         ┌──────────▼──────────┐                          │
-│         │   RRF (k=60)        │                          │
-│         │   Rank Fusion       │                          │
-│         └──────────┬──────────┘                          │
-│                    │                                     │
-└────────────────────┼────────────────────────────────────┘
-                     │ top-50 candidates
-                     ▼
-┌─────────────────────────────────────────────────────────┐
-│           Cross-Encoder Re-ranker                        │
-│     cross-encoder/ms-marco-MiniLM-L6-v2                  │
-│     Score each (query, passage) pair                     │
-└─────────────────────┬───────────────────────────────────┘
-                      │ top-10 ranked results
-                      ▼
-┌─────────────────────────────────────────────────────────┐
-│              Response (ranked meetings + highlights)      │
-└─────────────────────────────────────────────────────────┘
+User Query (prompt)
+   │
+   ▼
+Embedding (all-MiniLM-L6-v2) → query vector 384-dim
+   │
+   ▼
+Elasticsearch 8.x
+   ┌──────────────┐  ┌──────────────┐  ┌───────────────┐
+   │  BM25 Search │  │  kNN Search  │  │Metadata Filter│
+   │ (inverted    │  │ (HNSW        │  │ (structured   │
+   │  index)      │  │  dense_vec)  │  │  fields)      │
+   └──────┬───────┘  └──────┬───────┘  └──────┬────────┘
+          └─────────┬───────┴─────────────────┘
+                    ▼
+              RRF (k=60)
+                    │ top candidates
+                    ▼
+   Meeting-level aggregation (group by meeting_id)
+                    │ top-K meetings + highlights
+                    ▼
+       Response (ranked meetings + evidence passages)
 ```
 
-**RRF Formula:** `score = Σ 1/(k + rank_i)` where k=60 (standard).
-
-## 5. Reranking Strategy
-
-Reranking is the second stage that refines the top-N candidates from hybrid retrieval by scoring each (query, document) pair with full cross-attention.
-
-| Model | Params | Latency (50 docs, CPU) | BEIR NDCG@10 | Notes |
-|-------|--------|----------------------|-------------|-------|
-| ms-marco-MiniLM-L6-v2 | 22M | ~200-400ms | ~52 | Baseline cross-encoder |
-| FlashRank (ONNX MiniLM) | 22M | ~36ms | ~52 | Same model, ONNX optimized, 5-10x faster |
-| BGE-reranker-v2-m3 | 568M | ~800-1200ms | ~57 | High accuracy, too slow on CPU |
-| Jina-reranker-v2 | 137M | ~150-300ms | ~58 | Best accuracy/speed ratio |
-| Jina-reranker-v3 | ~400M | ~400-600ms | 61.94 | SOTA but heavier |
-| LLM-based (listwise) | >1B | ~2-5s | Highest | Impractical for <500ms budget |
-
-**Decision: Configurable multi-tier approach.** The system supports multiple reranking backends selectable via API parameter. This enables:
-- Fair benchmarking across methods in evaluation (Task 9)
-- Latency/quality tradeoff at query time
-- All options remain within <500ms total latency budget
-
-Candidate configurations for experiments:
-- `rerank=none` — RRF scores only (~20ms total)
-- `rerank=flash` — FlashRank ONNX (~56ms total)
-- `rerank=cross-encoder` — ms-marco-MiniLM-L6-v2 (~300ms total)
-- `rerank=jina` — Jina-reranker-v2 (~250ms total)
-
-Final model selection will be determined by Task 9 experiment results on our meeting corpus.
-
-## 6. Data & Chunking Strategy
+## 5. Data & Chunking Strategy
 
 **Datasets:**
-- AMI (`edinburghcstr/ami`, config `ihm`): 137 meetings, ~109K utterances, fields: `meeting_id`, `text`, `speaker_id`, `begin_time`, `end_time`
-- ICSI (`StDestiny/icsi_cleaned`): 59 meetings, fields: `src` (dialogue), `tgt` (summary)
-- QMSum (`pszemraj/qmsum-cleaned`): 232 meetings, 1,808 query-summary pairs, fields: `input` (query + dialogue), `output` (summary)
+- **QMSum** (232 meetings, ~1,808 query-summary pairs): dùng làm evaluation backbone vì có query-focused meeting relevance labels.
+- **AMI** (171 meetings, speaker turns + timestamps): dùng cho transcript chunking và speaker/time metadata.
 
-**Chunking Strategy: Speaker-turn grouping with sliding window fallback (Method B)**
+Public datasets thiếu metadata title/date/topic đáng tin cậy. Topic labels suy ra từ summaries/keyphrases phải được đánh dấu là derived metadata.
 
-We evaluated two approaches:
+**Chunking: Speaker-turn grouping + sliding-window fallback (Method B).**
 
-| Criteria | A: Fixed sliding window | B: Speaker-turn + fallback |
-|----------|------------------------|---------------------------|
-| Semantic coherence | ❌ Cuts mid-sentence/speaker | ✅ Preserves speaker boundaries |
-| Speaker attribution | ❌ Mixed speakers per chunk | ✅ Clear speaker metadata |
-| Supports "who said X" queries | ❌ No | ✅ Yes |
-| Chunk size consistency | ✅ Uniform 512 tokens | ⚠️ Variable, needs min/max bounds |
-| Implementation complexity | ✅ Simple | ⚠️ Moderate |
-| Embedding quality | ⚠️ Random boundaries dilute signal | ✅ Natural semantic units |
+Meeting transcripts là dialogue — speaker change thường tương quan với topic shift. Fixed-size chunking cắt ngang ranh giới này, tạo chunk lẫn speaker và câu bị cắt → giảm precision và phá highlight/speaker attribution. Method B giữ đơn vị hội thoại tự nhiên.
 
-**Why Method B:** Meeting transcripts are dialogue — speaker changes often correlate with topic shifts. Fixed-size chunking blindly cuts across these boundaries, producing chunks with mixed speakers and split sentences. This hurts both retrieval precision (diluted semantic signal) and the highlight feature (can't attribute text to speakers). Method B preserves natural conversation units while maintaining chunk sizes suitable for embedding models.
+Algorithm:
+1. Gộp consecutive utterances cùng speaker thành block.
+2. Tích lũy turns đến target ~384 tokens.
+3. Block > 512 tokens → sliding window (512, overlap 100).
+4. Mỗi chunk lưu: `meeting_id`, `speakers[]`, `time_start`, `time_end`, `content_text`, `metadata_text`.
 
-**Algorithm:**
-1. Merge consecutive utterances from same speaker into one block
-2. If merged block < 200 tokens → merge with next speaker block (retain both speaker IDs)
-3. If merged block > 512 tokens → apply sliding window (512 tokens, 100 token overlap)
-4. Each chunk stores: `meeting_id`, `speakers[]`, `time_start`, `time_end`, `text`
+**Indexing: single-level + meeting grouping.** Index chunks (passage-level) với meeting metadata là field trên mỗi chunk; group theo `meeting_id` trong response. Passage-level cần cho highlighting.
 
-**Indexing: Single-level with meeting grouping**
-- Index chunks (passage-level) with meeting metadata as fields on each chunk
-- Group results by `meeting_id` in response to show per-meeting results
-- Simpler than two-level, and passage-level is needed for highlighting anyway
+## 6. Meeting-level Ranking & Evidence Aggregation
 
-## 7. Vector Database Selection
+Engine retrieve chunks nhưng sản phẩm trả về meeting minutes, nên ranking phải gộp evidence passage-level thành meeting-level.
 
-**Decision: Elasticsearch 8.x** over FAISS and Milvus.
+1. Retrieve top-N chunks (sau RRF).
+2. Group theo `meeting_id`.
+3. Meeting score = best chunk score + small boost từ extra relevant chunks.
+4. Trả top meetings, mỗi cái kèm 2-3 evidence passages, speakers, timestamps, highlights.
 
-| Capability | Elasticsearch 8.x | FAISS | Milvus |
-|-----------|-------------------|-------|--------|
-| Vector kNN search | ✅ | ✅ (fastest) | ✅ |
-| BM25 keyword search | ✅ (best-in-class) | ❌ | ⚠️ basic |
-| Metadata filtering | ✅ native | ❌ must build separately | ✅ |
-| RRF fusion | ✅ built-in, single query | ❌ | ✅ |
-| Highlight matching text | ✅ native | ❌ | ❌ |
-| Near real-time indexing | ✅ (~1s) | ❌ (rebuild index) | ✅ |
-| Deployment complexity | 1 container | Library only | 3+ containers |
+Vì sao:
+- Best chunk score tránh meeting dài thắng chỉ vì nhiều chunk.
+- Small boost thưởng meeting có nhiều đoạn liên quan.
+- Trả passages giữ kết quả explainable.
 
-Rationale: Project requires hybrid search (BM25 + vector + metadata) in one query. Dataset is small (~23K vectors, ~35MB). ES handles this trivially while providing all features natively. FAISS/Milvus would require building BM25, metadata filtering, and highlighting separately.
+## 7. Vector Database: Elasticsearch 8.x
 
-## 8. TurboVec (TurboQuant, ICLR 2026) — Experimental Comparison
+ES kết hợp BM25 mature, vector kNN, structured filters, RRF-style fusion, highlighting, và near-real-time indexing trong một search engine. Khớp trực tiếp yêu cầu demo: prompt search trên nội dung, metadata filters, meeting-level results, evidence passages, text highlights — không cần ghép nhiều service.
 
-TurboVec is included as an experimental comparison in Task 9, not as the primary search backend.
+## 8. Evaluation Framework
 
-**Why not primary:** TurboVec only does vector search — no BM25, no metadata filtering, no highlighting. At 23K vectors, compression/speed gains are irrelevant (brute-force is <1ms). At d=384, TurboQuant's theoretical guarantees are weaker (low-dim regime).
+Đánh giá phải khớp behavior sản phẩm: prompt tự nhiên → ranked meeting minutes kèm evidence.
 
-**Why include as experiment:** Academic novelty (ICLR 2026), empirical data at d=384 where few benchmarks exist, demonstrates knowledge of cutting-edge algorithms.
+### Ground Truth
 
-## 9. Evaluation Framework
+| Level | Unit | Source | Metrics |
+|-------|------|--------|---------|
+| Meeting-level | meeting_id | QMSum query-meeting pairs | Recall@K, MRR, NDCG@K |
+| Latency | request | Benchmark script | p50, p95 |
 
-*(To be discussed and finalized)*
+### Configurations so sánh
+- BM25-only
+- Semantic-only (dense)
+- Hybrid BM25 + dense (RRF)
+
+### Success Criteria
+- Default config p95 latency < 500ms trên máy demo (benchmark, không giả định).
+- Hybrid cải thiện meeting-level Recall@10 hoặc MRR so với cả BM25-only và semantic-only.
+
+## 9. Citations
+
+| Topic | Citation | Why |
+|-------|----------|-----|
+| BM25 | Robertson et al., Okapi at TREC-3, 1994; Robertson & Zaragoza, FnTIR 2009 | Sparse baseline cho terms, people, IDs, dates |
+| RRF | Cormack, Clarke, Buettcher, SIGIR 2009 | Fusion BM25 + dense |
+| Sentence embeddings | Reimers & Gurevych, EMNLP-IJCNLP 2019 | Bi-encoder chunk embeddings |
+| Dense retrieval | Karpukhin et al., EMNLP 2020 | Dense passage retrieval |
+| ANN/HNSW | Malkov & Yashunin, IEEE TPAMI 2020 | Scalable approximate kNN |
+| Meeting benchmark | Zhong et al., NAACL 2021 | QMSum query-focused meeting data |
+
+Reference URLs:
+- RRF: https://doi.org/10.1145/1571941.1572114
+- Sentence-BERT: https://aclanthology.org/D19-1410/
+- DPR: https://aclanthology.org/2020.emnlp-main.550/
+- QMSum: https://aclanthology.org/2021.naacl-main.472/
+- HNSW: https://doi.org/10.1109/TPAMI.2018.2889473
+
+## 10. Final Decisions
+
+1. Elasticsearch làm backend — BM25 + vector kNN + metadata filters + RRF + highlighting + near real-time trong một system.
+2. Content-only MiniLM embeddings làm dense representation; metadata qua structured fields + BM25.
+3. Rule-based query understanding trước retrieval để prompt kích hoạt filters cho people/dates/source.
+4. Trả meeting-level results kèm evidence passages cho explainability.
+5. Đánh giá ở meeting-level + latency để chứng minh hệ thống giải quyết bài toán sản phẩm.

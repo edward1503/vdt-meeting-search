@@ -24,6 +24,8 @@ build/
 # Data (large files)
 data/raw/
 data/processed/
+data/processed_sample/
+data/*.zip
 *.csv
 *.json
 !evaluation/*.json
