@@ -43,6 +43,7 @@ data/processed/meetings.jsonl
 data/processed/chunks.jsonl
 data/processed/qmsum_queries.jsonl
 data/processed/qrels.jsonl
+data/processed/metadata_queries.jsonl
 ```
 
 `meetings.jsonl` is the normalized meeting-level source of truth.
@@ -50,6 +51,8 @@ data/processed/qrels.jsonl
 `chunks.jsonl` is the indexing input for Elasticsearch.
 
 `qmsum_queries.jsonl` and `qrels.jsonl` are used for meeting-level retrieval evaluation.
+
+`metadata_queries.jsonl` is a small multi-condition set (chủ đề + người + thời gian) for prompt NLU and separate metadata-channel evaluation.
 
 ## Unified Meeting Schema
 
@@ -309,7 +312,37 @@ The MVP uses:
 - `text` / `content_text` for BM25 and highlighting;
 - `metadata_text` for BM25 metadata matching;
 - structured fields for exact filtering;
-- `content_embedding = embed(text)` for dense retrieval.
+- `content_embedding = embed(text)` for dense retrieval over content;
+- `metadata_embedding = embed(metadata_text)` for dense retrieval over metadata.
+
+README yêu cầu "vector embeddings cho cả nội dung và metadata", nên pipeline tạo **cả hai** embedding. `metadata_text` được xây từ các trường có ngữ nghĩa (title, speakers, role, date, source, topic) — không chỉ ID thuần — để metadata embedding có giá trị. Structured fields vẫn dùng cho exact filtering; đóng góp thực tế của metadata embedding được đo bằng đánh giá theo-nguồn (xem mục Metadata Query Set).
+
+## Metadata Query Set
+
+Tạo file nhỏ `data/processed/metadata_queries.jsonl` để kiểm tra **prompt NLU đa điều kiện** và đánh giá riêng kênh metadata (README: truy vấn nhiều điều kiện theo chủ đề + người + thời gian; đánh giá riêng từng nguồn).
+
+Recommended schema:
+
+```json
+{
+  "query_id": "meta_ami_001",
+  "query": "Find AMI meetings led by the project manager about interface design in 2005",
+  "expected_filters": {
+    "source": "ami",
+    "speaker_role": "PM",
+    "date_range": ["2005-01-01", "2005-12-31"]
+  },
+  "relevant_meeting_ids": ["ami_ES2002a"]
+}
+```
+
+Bắt đầu nhỏ (10–20 truy vấn). Sinh từ chunk thật, không bịa: lấy 1 chunk AMI có speaker/role/time rõ → trích keyword → tạo câu hỏi tự nhiên → đặt cuộc họp liên quan = cuộc họp của chunk đó. Bao phủ các trường hợp:
+
+- chủ đề (topic) đơn thuần;
+- người tham gia (speaker/role) đơn thuần;
+- thời gian (date/range) đơn thuần;
+- kết hợp chủ đề + người + thời gian;
+- truy vấn mơ hồ (không áp hard filter).
 
 ## Processing Command
 
@@ -377,8 +410,9 @@ Indexing consumes `chunks.jsonl` and creates fields equivalent to:
 ```text
 content_text/text -> BM25 + highlight
 metadata_text -> BM25 metadata matching
-content_embedding -> dense vector kNN
-meeting_id/source/speakers/time_start/time_end -> structured filters
+content_embedding -> dense vector kNN (content)
+metadata_embedding -> dense vector kNN (metadata)
+meeting_id/source/speakers/speaker_roles/date/time_start/time_end -> structured filters
 ```
 
 Keeping processing separate from indexing makes evaluation, debugging, and reruns easier.

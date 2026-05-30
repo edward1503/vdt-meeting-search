@@ -19,22 +19,25 @@
 
 ## 3. Embedding Input & Metadata Representation
 
-**Decision: embed raw chunk content only.** Metadata được xử lý qua kênh riêng, không trộn vào dense vector.
+**Decision (ground theo README): embedding cho CẢ nội dung VÀ metadata.** README ghi rõ "xây dựng vector embeddings cho cả nội dung văn bản và metadata", nên hệ thống tạo **hai embedding**: `content_embedding` (nghĩa của nội dung) và `metadata_embedding` (nghĩa của metadata_text). Đồng thời vẫn giữ structured fields cho **exact filtering** — embedding bổ sung khả năng *semantic matching trên metadata*, không thay thế filter.
 
 Lý do:
-1. **Separation of concerns.** ES structured fields lo filtering (speaker, date, source); BM25 lo keyword matching; dense vector chỉ lo semantic similarity trên *nội dung*. Không trộn trách nhiệm vào một vector 384-dim.
-2. **Embedding capacity.** Token metadata như speaker ID ("MEO069") không mang ngữ nghĩa — làm loãng tín hiệu nội dung.
-3. **RRF là điểm tích hợp.** RRF gộp BM25 (bắt metadata/keyword) và kNN (semantic content) mà không cần kênh nào biết kênh kia.
+1. **Đúng yêu cầu đề bài.** Đề yêu cầu vector cho cả hai nguồn; đây là điểm phải bám sát, không chỉ dùng BM25 cho metadata.
+2. **Semantic matching trên metadata.** Cho phép prompt kiểu "discussion led by the project manager" khớp với role/title dù không trùng từ khóa — điều BM25 thuần không làm tốt.
+3. **Tách kênh để đánh giá riêng (NF3).** Có `content_embedding` và `metadata_embedding` tách biệt giúp **đánh giá riêng đóng góp của nội dung và metadata** đúng như README yêu cầu.
+
+Lưu ý trung thực (assumption): metadata dạng ID thuần (vd "MEO069") gần như không mang nghĩa nên embedding ít lợi; phần có lợi là **title, topic, role, speaker name**. Vì vậy `metadata_text` được xây từ các trường có ngữ nghĩa, và đóng góp thực tế của `metadata_embedding` phải được **đo bằng đánh giá theo-nguồn** (mục 8), không giả định trước.
 
 Biểu diễn:
 - `content_text`: text passage sạch cho BM25 + highlighting
 - `content_embedding`: dense vector của `content_text`
-- `metadata_text`: dạng text của title, speakers, date, source, topic — cho BM25
+- `metadata_text`: dạng text của title, speakers, role, date, source, topic — cho BM25 **và** metadata embedding
+- `metadata_embedding`: dense vector của `metadata_text`
 - structured fields: exact filters cho speaker, time range, meeting_id, source
 
 ## 4. Hybrid Search Architecture (Elasticsearch 8.x)
 
-Trước retrieval, một bước query-understanding nhẹ (rule-based) tách prompt thành `semantic_query` + `filters`. Dùng deterministic components: speaker dictionary, date parsing, source/meeting-id matching. Filter confidence thấp **không** áp như hard filter — giữ full prompt cho BM25 và dense retrieval. Điều này giữ prompt search thực dụng mà không cần LLM, và lỗi filter có thể debug tách biệt khỏi ranking.
+Trước retrieval, một bước query-understanding (rule-based) tách prompt thành `semantic_query` + `filters` với **ba loại điều kiện theo README: chủ đề (topic), người tham gia (speaker), thời gian (date/range)**. Dùng deterministic components: speaker dictionary, date parser (mốc và khoảng), source/meeting-id matching; topic giữ trong `semantic_query`. Filter confidence thấp **không** áp như hard filter — giữ full prompt cho BM25 và dense retrieval. Điều này giữ prompt search thực dụng mà không cần LLM, và lỗi filter có thể debug tách biệt khỏi ranking.
 
 ```
 User Query (prompt)
@@ -100,23 +103,37 @@ ES kết hợp BM25 mature, vector kNN, structured filters, RRF-style fusion, hi
 
 ## 8. Evaluation Framework
 
-Đánh giá phải khớp behavior sản phẩm: prompt tự nhiên → ranked meeting minutes kèm evidence.
+Đánh giá phải khớp behavior sản phẩm **và bám các tiêu chí README** (Precision/Recall/MRR, đánh giá riêng từng nguồn, truy vấn phức tạp, độ trễ, ảnh hưởng cấu hình).
 
 ### Ground Truth
 
 | Level | Unit | Source | Metrics |
 |-------|------|--------|---------|
-| Meeting-level | meeting_id | QMSum query-meeting pairs | Recall@K, MRR, NDCG@K |
+| Meeting-level | meeting_id | QMSum query-meeting pairs | Precision@K, Recall@K, MRR, NDCG@K |
+| Complex-query (đa điều kiện) | meeting_id | `metadata_queries.jsonl` (chủ đề + người + thời gian) | Filter accuracy, Recall@K, MRR |
 | Latency | request | Benchmark script | p50, p95 |
 
+### Đánh giá riêng theo nguồn (NF3 — README yêu cầu)
+Đo riêng đóng góp của từng nguồn để biết nội dung và metadata mỗi cái giúp được bao nhiêu:
+- **Content-only:** chỉ `content_text` BM25 + `content_embedding`.
+- **Metadata-only:** chỉ `metadata_text` BM25 + `metadata_embedding`.
+- **Hybrid:** kết hợp cả hai qua RRF + structured filters.
+
 ### Configurations so sánh
-- BM25-only
-- Semantic-only (dense)
-- Hybrid BM25 + dense (RRF)
+- BM25-only / Semantic-only (dense) / Hybrid (RRF).
+- Content-only / Metadata-only / Hybrid (theo nguồn, ở trên).
+
+### Config-influence study (NF5 — README yêu cầu)
+- **Kích thước embedding:** vd 384 (MiniLM) so với 768 (model lớn hơn) — ảnh hưởng chất lượng vs độ trễ/bộ nhớ.
+- **Index strategy:** tham số HNSW (`num_candidates`/ef) và kích thước ứng viên kNN — ảnh hưởng recall vs latency.
+
+### Complex queries (F6 — README yêu cầu)
+Bộ truy vấn nhiều điều kiện gồm **chủ đề + người tham gia + thời gian** để kiểm tra NLU tách filter và metadata matching.
 
 ### Success Criteria
 - Default config p95 latency < 500ms trên máy demo (benchmark, không giả định).
 - Hybrid cải thiện meeting-level Recall@10 hoặc MRR so với cả BM25-only và semantic-only.
+- Thêm metadata embedding phải cải thiện (hoặc ít nhất không hại) đánh giá theo-nguồn so với metadata BM25 thuần.
 
 ## 9. Citations
 
@@ -139,7 +156,7 @@ Reference URLs:
 ## 10. Final Decisions
 
 1. Elasticsearch làm backend — BM25 + vector kNN + metadata filters + RRF + highlighting + near real-time trong một system.
-2. Content-only MiniLM embeddings làm dense representation; metadata qua structured fields + BM25.
-3. Rule-based query understanding trước retrieval để prompt kích hoạt filters cho people/dates/source.
+2. **Embedding cho cả nội dung và metadata** (`content_embedding` + `metadata_embedding`) theo README, kèm structured fields cho exact filtering.
+3. Rule-based query understanding đa điều kiện (chủ đề + người + thời gian) trước retrieval.
 4. Trả meeting-level results kèm evidence passages cho explainability.
-5. Đánh giá ở meeting-level + latency để chứng minh hệ thống giải quyết bài toán sản phẩm.
+5. Đánh giá đa tầng: meeting-level (Precision/Recall/MRR/NDCG), **riêng theo nguồn nội dung vs metadata**, truy vấn phức tạp, latency, và **ảnh hưởng cấu hình (embedding size, index strategy)**.
