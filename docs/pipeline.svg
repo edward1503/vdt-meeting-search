@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#475569"/>
+    </marker>
+    <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#16a34a"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="500" y="30" text-anchor="middle" font-size="17" font-weight="bold" fill="#1e293b">Data Processing Pipeline &amp; Workflow</text>
+  <text x="500" y="50" text-anchor="middle" font-size="11" fill="#64748b">Raw Corpus → Parse → Chunk → Embed → Index → Search</text>
+
+  <!-- Phase 1: Raw Data -->
+  <rect x="20" y="75" width="160" height="130" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="100" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#92400e">① RAW DATA</text>
+  <rect x="35" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#d97706"/>
+  <text x="100" y="124" text-anchor="middle" font-size="10" fill="#78350f">AMI Corpus (XML)</text>
+  <rect x="35" y="140" width="130" height="28" rx="4" fill="#fff" stroke="#d97706"/>
+  <text x="100" y="159" text-anchor="middle" font-size="10" fill="#78350f">QMSum (JSON)</text>
+  <text x="100" y="190" text-anchor="middle" font-size="9" fill="#6b7280">~48MB raw</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="180" y1="140" x2="215" y2="140" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Phase 2: Parse -->
+  <rect x="220" y="75" width="160" height="130" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="300" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">② PARSE</text>
+  <rect x="235" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#2563eb"/>
+  <text x="300" y="124" text-anchor="middle" font-size="10" fill="#1e3a8a">parse_ami.py</text>
+  <rect x="235" y="140" width="130" height="28" rx="4" fill="#fff" stroke="#2563eb"/>
+  <text x="300" y="159" text-anchor="middle" font-size="10" fill="#1e3a8a">parse_qmsum.py</text>
+  <text x="300" y="185" text-anchor="middle" font-size="9" fill="#6b7280">Normalize → meetings.jsonl</text>
+  <text x="300" y="197" text-anchor="middle" font-size="9" fill="#6b7280">+ queries + qrels</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="380" y1="140" x2="415" y2="140" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Phase 3: Chunk -->
+  <rect x="420" y="75" width="160" height="130" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="500" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#166534">③ CHUNK</text>
+  <rect x="435" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#16a34a"/>
+  <text x="500" y="124" text-anchor="middle" font-size="10" fill="#14532d">chunking.py</text>
+  <text x="500" y="150" text-anchor="middle" font-size="9" fill="#6b7280">Speaker-aware splitting</text>
+  <text x="500" y="163" text-anchor="middle" font-size="9" fill="#6b7280">target=384 tok, max=512</text>
+  <text x="500" y="176" text-anchor="middle" font-size="9" fill="#6b7280">overlap=100 tokens</text>
+  <text x="500" y="195" text-anchor="middle" font-size="9" fill="#6b7280">→ chunks.jsonl (42MB)</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="580" y1="140" x2="615" y2="140" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Phase 4: Embed -->
+  <rect x="620" y="75" width="160" height="130" rx="8" fill="#fae8ff" stroke="#a855f7" stroke-width="1.5"/>
+  <text x="700" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#6b21a8">④ EMBED</text>
+  <rect x="635" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#9333ea"/>
+  <text x="700" y="124" text-anchor="middle" font-size="10" fill="#581c87">model.py</text>
+  <text x="700" y="150" text-anchor="middle" font-size="9" fill="#6b7280">all-MiniLM-L6-v2</text>
+  <text x="700" y="163" text-anchor="middle" font-size="9" fill="#6b7280">384-dim, cosine sim</text>
+  <text x="700" y="176" text-anchor="middle" font-size="9" fill="#6b7280">Dual: content + metadata</text>
+  <text x="700" y="195" text-anchor="middle" font-size="9" fill="#6b7280">batch_size=64</text>
+
+  <!-- Arrow 4→5 -->
+  <line x1="780" y1="140" x2="815" y2="140" stroke="#475569" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- Phase 5: Index -->
+  <rect x="820" y="75" width="160" height="130" rx="8" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="900" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#991b1b">⑤ INDEX</text>
+  <rect x="835" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#dc2626"/>
+  <text x="900" y="124" text-anchor="middle" font-size="10" fill="#7f1d1d">bulk_index.py</text>
+  <text x="900" y="150" text-anchor="middle" font-size="9" fill="#6b7280">Elasticsearch 8.15</text>
+  <text x="900" y="163" text-anchor="middle" font-size="9" fill="#6b7280">BM25 + dense_vector</text>
+  <text x="900" y="176" text-anchor="middle" font-size="9" fill="#6b7280">kNN index (cosine)</text>
+  <text x="900" y="195" text-anchor="middle" font-size="9" fill="#6b7280">helpers.bulk()</text>
+
+  <!-- Data Flow Detail Section -->
+  <rect x="20" y="230" width="960" height="110" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="40" y="252" font-size="11" font-weight="bold" fill="#334155">DATA SCHEMA FLOW</text>
+
+  <!-- Meeting schema -->
+  <rect x="40" y="262" width="200" height="65" rx="4" fill="#fff" stroke="#94a3b8"/>
+  <text x="140" y="278" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">Meeting (normalized)</text>
+  <text x="50" y="293" font-size="9" fill="#475569">meeting_id, source, title, date</text>
+  <text x="50" y="305" font-size="9" fill="#475569">participants, turns[{speaker, text}]</text>
+  <text x="50" y="317" font-size="9" fill="#475569">metadata: {domain, topic, ...}</text>
+
+  <line x1="240" y1="295" x2="280" y2="295" stroke="#475569" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- Chunk schema -->
+  <rect x="285" y="262" width="220" height="65" rx="4" fill="#fff" stroke="#94a3b8"/>
+  <text x="395" y="278" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">Chunk</text>
+  <text x="295" y="293" font-size="9" fill="#475569">chunk_id, meeting_id, content_text</text>
+  <text x="295" y="305" font-size="9" fill="#475569">metadata_text, speakers[], token_count</text>
+  <text x="295" y="317" font-size="9" fill="#475569">time_start, time_end, source, title</text>
+
+  <line x1="505" y1="295" x2="545" y2="295" stroke="#475569" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- ES Document -->
+  <rect x="550" y="262" width="220" height="65" rx="4" fill="#fff" stroke="#94a3b8"/>
+  <text x="660" y="278" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">ES Document</text>
+  <text x="560" y="293" font-size="9" fill="#475569">...chunk fields +</text>
+  <text x="560" y="305" font-size="9" fill="#475569">content_embedding: float[384]</text>
+  <text x="560" y="317" font-size="9" fill="#475569">metadata_embedding: float[384]</text>
+
+  <line x1="770" y1="295" x2="810" y2="295" stroke="#475569" stroke-width="1.2" marker-end="url(#arr)"/>
+
+  <!-- Search Result -->
+  <rect x="815" y="262" width="150" height="65" rx="4" fill="#fff" stroke="#94a3b8"/>
+  <text x="890" y="278" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">Search Result</text>
+  <text x="825" y="293" font-size="9" fill="#475569">meeting_id, score</text>
+  <text x="825" y="305" font-size="9" fill="#475569">evidence[3]</text>
+  <text x="825" y="317" font-size="9" fill="#475569">participants, title</text>
+
+  <!-- Real-time Ingest Path -->
+  <rect x="20" y="360" width="960" height="120" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="40" y="382" font-size="11" font-weight="bold" fill="#166534">REAL-TIME INGEST PATH (POST /meetings)</text>
+
+  <rect x="50" y="395" width="140" height="40" rx="5" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="120" y="420" text-anchor="middle" font-size="10" fill="#14532d">HTTP Request</text>
+  <line x1="190" y1="415" x2="225" y2="415" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="230" y="395" width="120" height="40" rx="5" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="290" y="420" text-anchor="middle" font-size="10" fill="#14532d">Validate</text>
+  <line x1="350" y1="415" x2="385" y2="415" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="390" y="395" width="120" height="40" rx="5" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="450" y="420" text-anchor="middle" font-size="10" fill="#14532d">Chunk</text>
+  <line x1="510" y1="415" x2="545" y2="415" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="550" y="395" width="120" height="40" rx="5" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="610" y="420" text-anchor="middle" font-size="10" fill="#14532d">Embed</text>
+  <line x1="670" y1="415" x2="705" y2="415" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="710" y="395" width="140" height="40" rx="5" fill="#fff" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="780" y="420" text-anchor="middle" font-size="10" fill="#14532d">Delete old + Index</text>
+  <line x1="850" y1="415" x2="885" y2="415" stroke="#16a34a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+  <rect x="890" y="395" width="70" height="40" rx="5" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="925" y="420" text-anchor="middle" font-size="10" fill="#14532d">✓ 201</text>
+
+  <text x="500" y="465" text-anchor="middle" font-size="10" fill="#6b7280">Atomic per meeting: delete_by_query → bulk index → refresh</text>
+</svg>
