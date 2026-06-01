@@ -1,0 +1,12 @@
+.git
+data/
+*.zip
+__pycache__
+*.pyc
+.pytest_cache
+.env
+docs/
+tests/
+evaluation/
+nexus-intelligence/
+*.md

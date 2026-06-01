@@ -99,7 +99,7 @@
   <rect x="40" y="415" width="150" height="55" rx="5" fill="#fef3c7" stroke="#f59e0b"/>
   <text x="115" y="435" text-anchor="middle" font-size="10" font-weight="bold" fill="#92400e">Step 1</text>
   <text x="115" y="450" text-anchor="middle" font-size="9" fill="#78350f">docker compose up</text>
-  <text x="115" y="462" text-anchor="middle" font-size="9" fill="#6b7280">(ES on :9200)</text>
+  <text x="115" y="462" text-anchor="middle" font-size="9" fill="#6b7280">(ES on :9201)</text>
   <line x1="190" y1="442" x2="215" y2="442" stroke="#475569" stroke-width="1.2" marker-end="url(#a)"/>
 
   <rect x="220" y="415" width="150" height="55" rx="5" fill="#dbeafe" stroke="#3b82f6"/>

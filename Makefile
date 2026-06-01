@@ -28,7 +28,7 @@ clean: ## Clean generated files
 preprocess: ## Run data preprocessing
 	python -m src.preprocessing.pipeline
 
-ES_HOST ?= http://localhost:9200
+ES_HOST ?= http://localhost:9201
 
 index: ## Index data to Elasticsearch
 	python -m src.indexing.bulk_index --es-host $(ES_HOST) --recreate

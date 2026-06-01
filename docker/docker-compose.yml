@@ -6,7 +6,7 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "9201:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
     healthcheck:
@@ -14,19 +14,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  api:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - ES_HOST=http://elasticsearch:9200
-      - INGEST_API_KEY=${INGEST_API_KEY:-dev-ingest-key}
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
 
 volumes:
   esdata:
