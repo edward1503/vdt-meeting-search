@@ -54,6 +54,8 @@ data/processed/metadata_queries.jsonl
 
 `metadata_queries.jsonl` is a small multi-condition set (chủ đề + người + thời gian) for prompt NLU and separate metadata-channel evaluation.
 
+Implementation status (03/06/2026): the current codebase implements `meetings.jsonl`, `chunks.jsonl`, `qmsum_queries.jsonl`, and `qrels.jsonl` through the preprocessing pipeline. `metadata_queries.jsonl` remains a planned evaluation artifact; no generator was found in the current `src/preprocessing/` code during this docs sync.
+
 ## Unified Meeting Schema
 
 Every dataset should be normalized into this JSONL schema:

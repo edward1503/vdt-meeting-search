@@ -1,5 +1,7 @@
 # Brainstorming Log - VDT Meeting Search
 
+> Historical note (docs sync 03/06/2026): file này là nhật ký brainstorm/ý tưởng ban đầu, không phải trạng thái implementation hiện tại. Source of truth hiện tại là `README.md`, `docs/plan.md`, `docs/research.md`, và `docs/sprint_plan.md`. Codebase hiện dùng self-host `intfloat/e5-base-v2` 768-dim, content + metadata embeddings tách riêng, FastAPI ingest/search API, demo UI, evaluation matrix, và tests.
+
 ## Thông tin đề bài
 - Xây dựng hệ thống Semantic Search real-time cho meeting minutes
 - Cho phép truy vấn bằng prompt tự nhiên

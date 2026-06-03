@@ -55,8 +55,8 @@
   <text x="700" y="95" text-anchor="middle" font-size="11" font-weight="bold" fill="#6b21a8">④ EMBED</text>
   <rect x="635" y="105" width="130" height="28" rx="4" fill="#fff" stroke="#9333ea"/>
   <text x="700" y="124" text-anchor="middle" font-size="10" fill="#581c87">model.py</text>
-  <text x="700" y="150" text-anchor="middle" font-size="9" fill="#6b7280">all-MiniLM-L6-v2</text>
-  <text x="700" y="163" text-anchor="middle" font-size="9" fill="#6b7280">384-dim, cosine sim</text>
+  <text x="700" y="150" text-anchor="middle" font-size="9" fill="#6b7280">intfloat/e5-base-v2</text>
+  <text x="700" y="163" text-anchor="middle" font-size="9" fill="#6b7280">768-dim, cosine sim</text>
   <text x="700" y="176" text-anchor="middle" font-size="9" fill="#6b7280">Dual: content + metadata</text>
   <text x="700" y="195" text-anchor="middle" font-size="9" fill="#6b7280">batch_size=64</text>
 
@@ -99,8 +99,8 @@
   <rect x="550" y="262" width="220" height="65" rx="4" fill="#fff" stroke="#94a3b8"/>
   <text x="660" y="278" text-anchor="middle" font-size="10" font-weight="bold" fill="#1e293b">ES Document</text>
   <text x="560" y="293" font-size="9" fill="#475569">...chunk fields +</text>
-  <text x="560" y="305" font-size="9" fill="#475569">content_embedding: float[384]</text>
-  <text x="560" y="317" font-size="9" fill="#475569">metadata_embedding: float[384]</text>
+  <text x="560" y="305" font-size="9" fill="#475569">content_embedding: float[768]</text>
+  <text x="560" y="317" font-size="9" fill="#475569">metadata_embedding: float[768]</text>
 
   <line x1="770" y1="295" x2="810" y2="295" stroke="#475569" stroke-width="1.2" marker-end="url(#arr)"/>
 

@@ -12,10 +12,10 @@
 
 ## 2. Embedding Model
 
-**Chosen: `all-MiniLM-L6-v2`** (bi-encoder, 384-dim).
-- Chạy tốt trên CPU (~5ms/text), 384-dim tiết kiệm storage.
-- Encode full chunk text thành 1 vector — nhanh, scalable, đủ cho meeting retrieval.
-- Vector được normalize → dot product = cosine similarity.
+**Chosen: `intfloat/e5-base-v2`** (bi-encoder, 768-dim), self-hosted through `sentence-transformers`.
+- Retrieval-optimized embedding model with asymmetric prefixes: `query:` for user prompts and `passage:` for indexed text.
+- Runs on local CUDA GPU when available; falls back to CPU through the same code path.
+- Encode full chunk text and metadata text into normalized vectors; Elasticsearch stores them as cosine `dense_vector` fields.
 
 ## 3. Embedding Input & Metadata Representation
 
@@ -43,7 +43,7 @@ Trước retrieval, một bước query-understanding (rule-based) tách prompt 
 User Query (prompt)
    │
    ▼
-Embedding (all-MiniLM-L6-v2) → query vector 384-dim
+Embedding (intfloat/e5-base-v2) → query vector 768-dim
    │
    ▼
 Elasticsearch 8.x
@@ -124,11 +124,13 @@ ES kết hợp BM25 mature, vector kNN, structured filters, RRF-style fusion, hi
 - Content-only / Metadata-only / Hybrid (theo nguồn, ở trên).
 
 ### Config-influence study (NF5 — README yêu cầu)
-- **Kích thước embedding:** vd 384 (MiniLM) so với 768 (model lớn hơn) — ảnh hưởng chất lượng vs độ trễ/bộ nhớ.
+- **Kích thước embedding:** default hiện tại là 768 (e5-base-v2); có thể so với 384-dim baseline hoặc 1024-dim model lớn hơn để đo chất lượng vs độ trễ/bộ nhớ.
 - **Index strategy:** tham số HNSW (`num_candidates`/ef) và kích thước ứng viên kNN — ảnh hưởng recall vs latency.
 
 ### Complex queries (F6 — README yêu cầu)
 Bộ truy vấn nhiều điều kiện gồm **chủ đề + người tham gia + thời gian** để kiểm tra NLU tách filter và metadata matching.
+
+Implementation status (03/06/2026): `evaluation/run_eval.py` đã đo QMSum meeting-level retrieval và channel content/metadata. Bộ `metadata_queries.jsonl` cho complex-query evaluation vẫn cần được tạo thêm nếu muốn benchmark riêng prompt đa điều kiện.
 
 ### Success Criteria
 - Default config p95 latency < 500ms trên máy demo (benchmark, không giả định).
@@ -156,7 +158,7 @@ Reference URLs:
 ## 10. Final Decisions
 
 1. Elasticsearch làm backend — BM25 + vector kNN + metadata filters + RRF + highlighting + near real-time trong một system.
-2. **Embedding cho cả nội dung và metadata** (`content_embedding` + `metadata_embedding`) theo README, kèm structured fields cho exact filtering.
+2. **Embedding cho cả nội dung và metadata** (`content_embedding` + `metadata_embedding`) bằng self-host `intfloat/e5-base-v2`, kèm structured fields cho exact filtering.
 3. Rule-based query understanding đa điều kiện (chủ đề + người + thời gian) trước retrieval.
 4. Trả meeting-level results kèm evidence passages cho explainability.
 5. Đánh giá đa tầng: meeting-level (Precision/Recall/MRR/NDCG), **riêng theo nguồn nội dung vs metadata**, truy vấn phức tạp, latency, và **ảnh hưởng cấu hình (embedding size, index strategy)**.

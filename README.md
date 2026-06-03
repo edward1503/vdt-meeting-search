@@ -8,7 +8,7 @@ Semantic search system for meeting minutes using hybrid BM25 + dense vector retr
 Query → Query Understanding (entity extraction)
      → Parallel:
          ├── BM25 full-text search
-         └── kNN dense vector search (all-MiniLM-L6-v2, 384d)
+         └── kNN dense vector search (intfloat/e5-base-v2, 768d)
      → RRF Fusion (Reciprocal Rank Fusion)
      → Meeting-level Aggregation (weighted: max + log bonus)
      → Top-K Results + Highlighted Chunks
@@ -19,7 +19,7 @@ Query → Query Understanding (entity extraction)
 | Stage | Module | Description |
 |-------|--------|-------------|
 | Preprocessing | `src/preprocessing/` | Parse AMI + QMSum corpora, chunk transcripts (512 tokens, 100 overlap) |
-| Embedding | `src/embedding/` | Encode chunks with `all-MiniLM-L6-v2` (sentence-transformers) |
+| Embedding | `src/embedding/` | Self-host `intfloat/e5-base-v2` with `sentence-transformers` on host CPU/GPU |
 | Indexing | `src/indexing/` | Bulk index to Elasticsearch with dense_vector + text fields |
 | Search | `src/search/` | Hybrid BM25 + kNN with RRF fusion, query understanding |
 | API | `src/api/` | FastAPI REST endpoints for search + CRUD |
@@ -27,7 +27,7 @@ Query → Query Understanding (entity extraction)
 
 ## Tech Stack
 
-- **Embedding**: `all-MiniLM-L6-v2` (384 dimensions, ~80MB)
+- **Embedding**: self-hosted `intfloat/e5-base-v2` (768 dimensions) via `sentence-transformers`; CUDA is used when available, otherwise CPU
 - **Vector DB**: Elasticsearch 8.15 (BM25 + kNN native)
 - **Fusion**: Reciprocal Rank Fusion (RRF) at application layer
 - **API**: FastAPI + Uvicorn
@@ -46,6 +46,8 @@ Query → Query Understanding (entity extraction)
 ```bash
 pip install -r requirements.txt
 ```
+
+The first indexing/search run downloads the embedding model locally through `sentence-transformers`.
 
 ### 2. Start Elasticsearch
 
@@ -71,13 +73,25 @@ make index
 ### 5. Run API
 
 ```bash
-uvicorn src.api.main:app --reload --port 8000
+uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### 6. Search
 
 ```bash
-curl "http://localhost:8000/search?query=budget+discussion&top_k=5"
+curl -X POST "http://localhost:8000/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"budget discussion","top_k":5,"mode":"hybrid"}'
+```
+
+### One-command startup
+
+On Git Bash or WSL, the project script starts Elasticsearch, indexes data if needed, then runs the API on the host so the embedding model can use the local GPU:
+
+```bash
+./start.sh --dev
+# If data is already indexed:
+./start.sh --skip-index --dev
 ```
 
 ## Evaluation
@@ -158,7 +172,8 @@ Environment variables (`.env`):
 
 ```env
 ES_HOST=http://localhost:9201
-EMBEDDING_MODEL=all-MiniLM-L6-v2
+EMBEDDING_MODEL=intfloat/e5-base-v2
+EMBEDDING_DIM=768
 CHUNK_SIZE=512
 CHUNK_OVERLAP=100
 INGEST_API_KEY=your-secret-key
