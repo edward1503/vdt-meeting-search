@@ -1,0 +1,156 @@
+{
+  "config": {
+    "qrels": "data\\eval\\ami_qrels.json",
+    "raw_dir": "D:\\VSCODE\\vdt-meeting-search\\data\\raw",
+    "index_dir": "D:\\VSCODE\\vdt-meeting-search\\data\\index",
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "dim": 384,
+    "chunks": 5347,
+    "top_k": 5,
+    "chunk_size_words": 260,
+    "chunk_overlap_words": 60
+  },
+  "shared_stats": {
+    "backend": "existing",
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "dim": 384
+  },
+  "results": [
+    {
+      "backend": "faiss",
+      "status": "ok",
+      "build_stats": {
+        "backend": "faiss",
+        "vectors": 5347,
+        "dim": 384
+      },
+      "build_time_sec": 0.2211,
+      "precision@k": 0.6,
+      "recall@k": 1.0,
+      "mrr@k": 1.0,
+      "latency_avg_ms": 7.9021,
+      "latency_p50_ms": 1.4919,
+      "latency_p95_ms": 60.6207,
+      "storage_mb": 7.8326,
+      "queries": 10,
+      "sample_results": [
+        {
+          "query": "meetings about battery life and power consumption",
+          "returned": [
+            "ami_ES2012b",
+            "ami_ES2002c",
+            "ami_ES2005c",
+            "ami_IS1009c",
+            "ami_ES2004c"
+          ],
+          "relevant": [
+            "ami_ES2002c",
+            "ami_ES2005c",
+            "ami_ES2012b"
+          ]
+        },
+        {
+          "query": "discussion about remote control user interface buttons",
+          "returned": [
+            "ami_ES2013b",
+            "ami_TS3005a",
+            "ami_ES2005c",
+            "ami_IS1005b",
+            "ami_ES2014b"
+          ],
+          "relevant": [
+            "ami_ES2005c",
+            "ami_ES2013b",
+            "ami_TS3005a"
+          ]
+        },
+        {
+          "query": "meetings about market research and customer needs",
+          "returned": [
+            "ami_ES2002b",
+            "ami_ES2004c",
+            "ami_ES2013b",
+            "ami_ES2004b",
+            "ami_IS1004a"
+          ],
+          "relevant": [
+            "ami_ES2002b",
+            "ami_ES2004c",
+            "ami_ES2013b"
+          ]
+        }
+      ]
+    },
+    {
+      "backend": "elasticsearch",
+      "status": "skipped",
+      "reason": "Elasticsearch is not reachable at http://localhost:9200"
+    },
+    {
+      "backend": "turbovec",
+      "status": "ok",
+      "build_stats": {
+        "backend": "turbovec",
+        "vectors": 5347,
+        "dim": 384,
+        "bit_width": 4
+      },
+      "build_time_sec": 0.7188,
+      "precision@k": 0.6,
+      "recall@k": 1.0,
+      "mrr@k": 1.0,
+      "latency_avg_ms": 4.3292,
+      "latency_p50_ms": 0.6878,
+      "latency_p95_ms": 36.8005,
+      "storage_mb": 1.0432,
+      "queries": 10,
+      "sample_results": [
+        {
+          "query": "meetings about battery life and power consumption",
+          "returned": [
+            "ami_ES2012b",
+            "ami_ES2002c",
+            "ami_ES2005c",
+            "ami_ES2004c",
+            "ami_ES2013b"
+          ],
+          "relevant": [
+            "ami_ES2002c",
+            "ami_ES2005c",
+            "ami_ES2012b"
+          ]
+        },
+        {
+          "query": "discussion about remote control user interface buttons",
+          "returned": [
+            "ami_ES2013b",
+            "ami_TS3005a",
+            "ami_ES2005c",
+            "ami_IS1005b",
+            "ami_TS3003b"
+          ],
+          "relevant": [
+            "ami_ES2005c",
+            "ami_ES2013b",
+            "ami_TS3005a"
+          ]
+        },
+        {
+          "query": "meetings about market research and customer needs",
+          "returned": [
+            "ami_ES2002b",
+            "ami_ES2004c",
+            "ami_ES2013b",
+            "ami_ES2004b",
+            "ami_IS1000b"
+          ],
+          "relevant": [
+            "ami_ES2002b",
+            "ami_ES2004c",
+            "ami_ES2013b"
+          ]
+        }
+      ]
+    }
+  ]
+}

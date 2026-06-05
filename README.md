@@ -53,6 +53,25 @@ python -m evaluation.run_eval --top-k 5
 python -m evaluation.run_eval --qrels data/eval/ami_qrels.json --top-k 5
 ```
 
+## Sprint 2 Retrieval Benchmark
+
+Sprint 2 keeps the Sprint 1 parser, chunking, embedding model, and qrels fixed, then compares three retrieval backends over the same chunk vectors:
+
+```bash
+python -m evaluation.benchmark_retrieval --model hashing --rebuild-shared --qrels data/eval/sample_qrels.json --top-k 5
+python -m evaluation.benchmark_retrieval --qrels data/eval/ami_qrels.json --top-k 5
+```
+
+The benchmark tries `faiss`, `elasticsearch`, and `turbovec` by default. FAISS and TurboVec run locally. Elasticsearch requires a reachable server at `ELASTICSEARCH_URL` / `http://localhost:9200`; if it is unavailable, the benchmark records that backend as skipped instead of failing the whole run.
+
+The API can also target a backend after the corresponding index has been built:
+
+```bash
+curl -X POST "http://localhost:8000/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"meetings about battery life","top_k":5,"backend":"turbovec"}'
+```
+
 The sample qrels are only a smoke test. Once AMI raw data is added, replace `data/eval/sample_qrels.json` with AMI-derived queries and relevant meeting ids.
 
 Current AMI MVP stats after indexing `ami_public_manual_1.6.2`:

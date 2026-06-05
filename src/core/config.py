@@ -16,7 +16,10 @@ class Settings:
     embedding_model: str = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     chunk_size_words: int = int(os.getenv("CHUNK_SIZE_WORDS", "260"))
     chunk_overlap_words: int = int(os.getenv("CHUNK_OVERLAP_WORDS", "60"))
+    retrieval_backend: str = os.getenv("RETRIEVAL_BACKEND", "faiss")
+    elasticsearch_url: str = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")
+    elasticsearch_index: str = os.getenv("ELASTICSEARCH_INDEX", "vdt-meeting-chunks")
+    turbovec_bit_width: int = int(os.getenv("TURBOVEC_BIT_WIDTH", "4"))
 
 
 settings = Settings()
-
