@@ -1,0 +1,15 @@
+[
+  {
+    "query": "meetings about battery life and power consumption",
+    "relevant_meeting_ids": ["sample_001"]
+  },
+  {
+    "query": "customer interviews and competitor market research",
+    "relevant_meeting_ids": ["sample_002"]
+  },
+  {
+    "query": "discussion about button layout and menu navigation",
+    "relevant_meeting_ids": ["sample_003"]
+  }
+]
+

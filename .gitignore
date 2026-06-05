@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.playwright-cli/
+.venv/
+venv/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Generated pipeline artifacts. Keep raw data and eval fixtures versioned.
+data/index/
+data/processed/
+
+# External AMI download kept locally for indexing.
+data/ami_public_manual_1.6.2/
+data/raw/ami_public_manual_1.6.2/

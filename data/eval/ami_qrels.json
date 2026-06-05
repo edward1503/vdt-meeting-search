@@ -1,0 +1,43 @@
+[
+  {
+    "query": "meetings about battery life and power consumption",
+    "relevant_meeting_ids": ["ami_ES2012b", "ami_ES2002c", "ami_ES2005c"]
+  },
+  {
+    "query": "discussion about remote control user interface buttons",
+    "relevant_meeting_ids": ["ami_ES2013b", "ami_TS3005a", "ami_ES2005c"]
+  },
+  {
+    "query": "meetings about market research and customer needs",
+    "relevant_meeting_ids": ["ami_ES2002b", "ami_ES2004c", "ami_ES2013b"]
+  },
+  {
+    "query": "project manager discussing product requirements",
+    "relevant_meeting_ids": ["ami_ES2015a", "ami_ES2007d", "ami_ES2004d"]
+  },
+  {
+    "query": "prototype design evaluation and testing",
+    "relevant_meeting_ids": ["ami_IS1006d", "ami_TS3005d", "ami_IS1008c"]
+  },
+  {
+    "query": "discussion about LCD display and screen design",
+    "relevant_meeting_ids": ["ami_ES2013c", "ami_IS1008c", "ami_ES2008c"]
+  },
+  {
+    "query": "meetings about cost target and product price",
+    "relevant_meeting_ids": ["ami_IS1002c", "ami_ES2014d", "ami_ES2012d"]
+  },
+  {
+    "query": "industrial designer talking about shape and casing",
+    "relevant_meeting_ids": ["ami_TS3011c", "ami_ES2016a", "ami_TS3009c"]
+  },
+  {
+    "query": "meetings about remote control features and functions",
+    "relevant_meeting_ids": ["ami_TS3005b", "ami_ES2013b", "ami_ES2010b"]
+  },
+  {
+    "query": "discussion about final presentation and project plan",
+    "relevant_meeting_ids": ["ami_ES2008a", "ami_TS3005a", "ami_TS3003d"]
+  }
+]
+

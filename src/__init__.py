@@ -1,0 +1,2 @@
+"""VDT meeting search package."""
+

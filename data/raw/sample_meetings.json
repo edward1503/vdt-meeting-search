@@ -1,0 +1,37 @@
+[
+  {
+    "meeting_id": "sample_001",
+    "source": "sample",
+    "title": "Remote Control Battery Design",
+    "date": "2026-05-01",
+    "participants": ["Project Manager", "Hardware Engineer", "UI Designer"],
+    "turns": [
+      {"speaker": "Project Manager", "speaker_role": "PM", "time_start": 0, "time_end": 20, "text": "We need to decide how the remote control should handle battery life, power consumption, and charging options."},
+      {"speaker": "Hardware Engineer", "speaker_role": "ME", "time_start": 21, "time_end": 52, "text": "The prototype can use two AAA batteries, but rechargeable cells may make the device more expensive."},
+      {"speaker": "UI Designer", "speaker_role": "UI", "time_start": 53, "time_end": 88, "text": "The interface should warn users before the battery is empty."}
+    ]
+  },
+  {
+    "meeting_id": "sample_002",
+    "source": "sample",
+    "title": "Market Research Planning",
+    "date": "2026-05-03",
+    "participants": ["Project Manager", "Marketing Expert", "Industrial Designer"],
+    "turns": [
+      {"speaker": "Marketing Expert", "speaker_role": "ME", "time_start": 0, "time_end": 35, "text": "Customer interviews show that users care about price, simplicity, and whether the remote looks modern."},
+      {"speaker": "Industrial Designer", "speaker_role": "ID", "time_start": 36, "time_end": 72, "text": "We should compare competitor products and prepare a design brief for the next prototype."}
+    ]
+  },
+  {
+    "meeting_id": "sample_003",
+    "source": "sample",
+    "title": "User Interface Button Layout",
+    "date": "2026-05-07",
+    "participants": ["UI Designer", "Project Manager", "Hardware Engineer"],
+    "turns": [
+      {"speaker": "UI Designer", "speaker_role": "UI", "time_start": 0, "time_end": 30, "text": "The remote control should have clear buttons for volume, channel selection, and a simple menu navigation key."},
+      {"speaker": "Project Manager", "speaker_role": "PM", "time_start": 31, "time_end": 61, "text": "The team agreed that usability is more important than adding too many advanced features."}
+    ]
+  }
+]
+
