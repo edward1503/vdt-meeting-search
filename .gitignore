@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Data (large files)
+data/raw/
+data/processed/
+data/processed_sample/
+data/*.zip
+*.csv
+*.json
+!evaluation/*.json
+!docs/*.json
+
+# Models
+models/
+*.bin
+*.pt
+*.onnx
+
+# Elasticsearch
+esdata/
+
+# Docker
+docker/volumes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
