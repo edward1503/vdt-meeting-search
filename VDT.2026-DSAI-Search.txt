@@ -1,0 +1,22 @@
+﻿1. Tổng quan bài toán & Thách thức
+Bài toán là Hybrid Information Retrieval.
+Input: một list các document chứa thông tin và một câu truy vấn.
+Output: top-k document liên quan tới câu truy vấn đó. 
+Thách thức của bài toán: Thách thức của bài toán nằm ở hai bối cảnh thực tế khác nhau
+* Single-hop Scenario: Trong bối cảnh này, quá trình truy vấn câu trả lời thường chỉ diễn ra trong một bước tìm kiếm (single-hop), thông tin cần tìm kiếm sẽ xuất hiện ngay tại một document nào đó. Tuy nhiên số lượng document thường tương đối lớn, ảnh hưởng tới tốc độ truy vấn. 
+* Multiple-hop Scenario: Trong bối cảnh này, thông tin cần tìm kiếm thường sẽ cần phải tổng hợp từ nhiều hơn 2 document khác nhau, dẫn tới việc truy vấn sẽ phải diễn ra trên nhiều bước tìm kiếm và phải có sự tổng hợp thông tin ở cuối quá trình truy vấn để đưa ra lựa chọn chính xác.
+2. Dữ liệu
+Dựa trên thách thức của bài toán, có 2 tập dữ liệu khác nhau được dùng cho 2 bối cảnh khác nhau:
+* Single-hop scenario: tập dữ liệu MS MACRO (sử dụng trực tiếp từ thư viện ir_datasets trong Python), bao gồm hơn 8 triệu documents, khoảng hơn 1 triệu câu truy vấn (tùy theo từng version khác nhau). 
+* Multiple-hop scenario: tập dữ liệu HotpotQA (sử dụng trực tiếp từ thư viện ir_datasets trong Python), bao gồm hơn 5 triệu documents, khoảng hơn 100k câu truy vấn (tùy theo từng version). 
+3. Metric đánh giá
+* Metric đánh giá độ chính xác: các ranking metrics (không tính thứ tự) như Precision@k, Recall@k,... 
+* Metric đánh giá tính real-time: Latency (p50, p95, p99), QPS (Queries per Second)
+4. Yêu cầu đầu ra VDT
+* Solution theo hướng dense-sparse retrieval, cân bằng được giữa độ chính xác và tốc độ xử lý. 
+* Kết quả đánh giá trên 1 trong 2 tập dữ liệu và benchmark với một số giải pháp hiện tại
+* Demo: giao diện front-end + back-end
+* Slide trình bày bảo vệ giai đoạn 1: tổng quan bài toán, tập dữ liệu sử dụng, sơ đồ kiến trúc giải pháp (mức độ system), metric và kết quả đánh giá trên 1 trong 2 tập dữ liệu
+5. Một số tài liệu tham khảo
+* https://arxiv.org/pdf/2410.20381v1
+* https://arxiv.org/pdf/2502.15526v1
