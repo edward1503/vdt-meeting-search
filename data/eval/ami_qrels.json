@@ -38,6 +38,45 @@
   {
     "query": "discussion about final presentation and project plan",
     "relevant_meeting_ids": ["ami_ES2008a", "ami_TS3005a", "ami_TS3003d"]
+  },
+  {
+    "query": "which meetings discuss soft rubber or plastic materials for the remote casing",
+    "relevant_meeting_ids": ["ami_ES2007c", "ami_ES2014d", "ami_TS3005c"]
+  },
+  {
+    "query": "meetings about making the remote look trendy fashionable or fun",
+    "relevant_meeting_ids": ["ami_TS3008b", "ami_ES2004b", "ami_TS3012c"]
+  },
+  {
+    "query": "meetings discussing child lock timer alarm or parental control features",
+    "relevant_meeting_ids": ["ami_IS1009b", "ami_IS1009c", "ami_ES2015b"]
+  },
+  {
+    "query": "meetings about target users target group and who the remote is designed for",
+    "relevant_meeting_ids": ["ami_ES2008b", "ami_IS1009b", "ami_ES2006b"]
+  },
+  {
+    "query": "meetings about fewer buttons and simplifying technical functions",
+    "relevant_meeting_ids": ["ami_ES2008b", "ami_TS3007a", "ami_TS3008b"]
+  },
+  {
+    "query": "meetings about manufacturing components materials case and power supply",
+    "relevant_meeting_ids": ["ami_ES2013c", "ami_TS3011c", "ami_IS1008c"]
+  },
+  {
+    "query": "meetings that focus on detailed design agenda minutes and prototype evaluation",
+    "relevant_meeting_ids": ["ami_ES2008d", "ami_TS3007d", "ami_IS1008d"]
+  },
+  {
+    "query": "meetings about colour choices visual appearance and the look of the remote",
+    "relevant_meeting_ids": ["ami_TS3008c", "ami_ES2008d", "ami_ES2014d"]
+  },
+  {
+    "query": "meetings about marketing campaign slogans and product positioning",
+    "relevant_meeting_ids": ["ami_IS1002c", "ami_IS1002b", "ami_IS1009b"]
+  },
+  {
+    "query": "meetings about finance cost implications and budget tradeoffs",
+    "relevant_meeting_ids": ["ami_ES2014d", "ami_TS3003d", "ami_TS3005d"]
   }
 ]
-

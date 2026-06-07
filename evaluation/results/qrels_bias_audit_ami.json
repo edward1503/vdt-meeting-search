@@ -1,0 +1,394 @@
+{
+  "qrels": "data\\eval\\ami_qrels.json",
+  "queries": 20,
+  "top_k": 5,
+  "relevant_per_query": [
+    3
+  ],
+  "missing_relevant_ids": [],
+  "lexical_coverage_avg": 0.9012,
+  "lexical_coverage_original_10": 0.95,
+  "lexical_coverage_added_10": 0.8524,
+  "method_results": [
+    {
+      "method": "embedding",
+      "buckets": {
+        "all_20": {
+          "precision@k": 0.34,
+          "recall@k": 0.5667,
+          "mrr@k": 0.5875,
+          "queries": 20
+        },
+        "original_10": {
+          "precision@k": 0.6,
+          "recall@k": 1.0,
+          "mrr@k": 1.0,
+          "queries": 10
+        },
+        "added_10": {
+          "precision@k": 0.08,
+          "recall@k": 0.1333,
+          "mrr@k": 0.175,
+          "queries": 10
+        }
+      }
+    },
+    {
+      "method": "multi_query_rrf",
+      "buckets": {
+        "all_20": {
+          "precision@k": 0.26,
+          "recall@k": 0.4333,
+          "mrr@k": 0.5417,
+          "queries": 20
+        },
+        "original_10": {
+          "precision@k": 0.46,
+          "recall@k": 0.7667,
+          "mrr@k": 0.9333,
+          "queries": 10
+        },
+        "added_10": {
+          "precision@k": 0.06,
+          "recall@k": 0.1,
+          "mrr@k": 0.15,
+          "queries": 10
+        }
+      }
+    },
+    {
+      "method": "llm_multi_query_rrf",
+      "buckets": {
+        "all_20": {
+          "precision@k": 0.25,
+          "recall@k": 0.4167,
+          "mrr@k": 0.5625,
+          "queries": 20
+        },
+        "original_10": {
+          "precision@k": 0.46,
+          "recall@k": 0.7667,
+          "mrr@k": 1.0,
+          "queries": 10
+        },
+        "added_10": {
+          "precision@k": 0.04,
+          "recall@k": 0.0667,
+          "mrr@k": 0.125,
+          "queries": 10
+        }
+      }
+    }
+  ],
+  "query_audit": [
+    {
+      "index": 0,
+      "query": "meetings about battery life and power consumption",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "battery",
+        "life",
+        "power",
+        "consumption"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 1,
+      "query": "discussion about remote control user interface buttons",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "remote",
+        "control",
+        "user",
+        "interface",
+        "buttons"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 2,
+      "query": "meetings about market research and customer needs",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "market",
+        "research",
+        "customer",
+        "needs"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 3,
+      "query": "project manager discussing product requirements",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "project",
+        "manager",
+        "product",
+        "requirements"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 4,
+      "query": "prototype design evaluation and testing",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "prototype",
+        "design",
+        "evaluation",
+        "testing"
+      ],
+      "relevant_term_coverage": 0.75,
+      "bucket": "original_10"
+    },
+    {
+      "index": 5,
+      "query": "discussion about LCD display and screen design",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "lcd",
+        "display",
+        "screen",
+        "design"
+      ],
+      "relevant_term_coverage": 0.75,
+      "bucket": "original_10"
+    },
+    {
+      "index": 6,
+      "query": "meetings about cost target and product price",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "cost",
+        "target",
+        "product",
+        "price"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 7,
+      "query": "industrial designer talking about shape and casing",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "industrial",
+        "designer",
+        "shape",
+        "casing"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 8,
+      "query": "meetings about remote control features and functions",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "remote",
+        "control",
+        "features",
+        "functions"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 9,
+      "query": "discussion about final presentation and project plan",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "final",
+        "presentation",
+        "project",
+        "plan"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "original_10"
+    },
+    {
+      "index": 10,
+      "query": "which meetings discuss soft rubber or plastic materials for the remote casing",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "which",
+        "discuss",
+        "soft",
+        "rubber",
+        "plastic",
+        "materials",
+        "remote",
+        "casing"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "added_10"
+    },
+    {
+      "index": 11,
+      "query": "meetings about making the remote look trendy fashionable or fun",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "making",
+        "remote",
+        "look",
+        "trendy",
+        "fashionable",
+        "fun"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "added_10"
+    },
+    {
+      "index": 12,
+      "query": "meetings discussing child lock timer alarm or parental control features",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "child",
+        "lock",
+        "timer",
+        "alarm",
+        "parental",
+        "control",
+        "features"
+      ],
+      "relevant_term_coverage": 0.8571,
+      "bucket": "added_10"
+    },
+    {
+      "index": 13,
+      "query": "meetings about target users target group and who the remote is designed for",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "target",
+        "users",
+        "target",
+        "group",
+        "who",
+        "remote",
+        "designed"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "added_10"
+    },
+    {
+      "index": 14,
+      "query": "meetings about fewer buttons and simplifying technical functions",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "fewer",
+        "buttons",
+        "simplifying",
+        "technical",
+        "functions"
+      ],
+      "relevant_term_coverage": 0.6,
+      "bucket": "added_10"
+    },
+    {
+      "index": 15,
+      "query": "meetings about manufacturing components materials case and power supply",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "manufacturing",
+        "components",
+        "materials",
+        "case",
+        "power",
+        "supply"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "added_10"
+    },
+    {
+      "index": 16,
+      "query": "meetings that focus on detailed design agenda minutes and prototype evaluation",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "that",
+        "focus",
+        "detailed",
+        "design",
+        "agenda",
+        "minutes",
+        "prototype",
+        "evaluation"
+      ],
+      "relevant_term_coverage": 1.0,
+      "bucket": "added_10"
+    },
+    {
+      "index": 17,
+      "query": "meetings about colour choices visual appearance and the look of the remote",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "colour",
+        "choices",
+        "visual",
+        "appearance",
+        "look",
+        "remote"
+      ],
+      "relevant_term_coverage": 0.6667,
+      "bucket": "added_10"
+    },
+    {
+      "index": 18,
+      "query": "meetings about marketing campaign slogans and product positioning",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "marketing",
+        "campaign",
+        "slogans",
+        "product",
+        "positioning"
+      ],
+      "relevant_term_coverage": 0.6,
+      "bucket": "added_10"
+    },
+    {
+      "index": 19,
+      "query": "meetings about finance cost implications and budget tradeoffs",
+      "relevant_count": 3,
+      "missing_relevant_ids": [],
+      "query_terms": [
+        "finance",
+        "cost",
+        "implications",
+        "budget",
+        "tradeoffs"
+      ],
+      "relevant_term_coverage": 0.8,
+      "bucket": "added_10"
+    }
+  ],
+  "notes": [
+    "The first 10 queries are the original MVP set and may be biased toward embedding results.",
+    "The added 10 queries were labeled from corpus/chunk content inspection, not from embedding top results.",
+    "This is still not a blind human-labeled benchmark; treat it as a stronger smoke test, not final quality evidence."
+  ]
+}

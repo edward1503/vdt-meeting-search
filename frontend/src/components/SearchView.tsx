@@ -3,6 +3,16 @@ import { Activity, Brain, Calendar, CheckSquare, Database, Filter, Search, Spark
 import { motion } from 'motion/react';
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000';
+const SEARCH_METHODS = [
+  { value: 'embedding', label: 'Semantic' },
+  { value: 'rule_expansion', label: 'Rules' },
+  { value: 'hyde_template', label: 'HyDE' },
+  { value: 'multi_query_rrf', label: 'Multi-query' },
+  { value: 'hybrid_rrf', label: 'Hybrid' },
+  { value: 'llm_query_expansion', label: 'LLM expand' },
+  { value: 'llm_hyde', label: 'LLM HyDE' },
+  { value: 'llm_multi_query_rrf', label: 'LLM RRF' },
+];
 
 interface Snippet {
   chunk_id: string;
@@ -25,6 +35,7 @@ interface SearchResult {
 interface SearchResponse {
   query: string;
   top_k: number;
+  method: string;
   results: SearchResult[];
   latency_ms: number;
 }
@@ -32,6 +43,7 @@ interface SearchResponse {
 export default function SearchView() {
   const [query, setQuery] = useState('meetings about battery life and power consumption');
   const [speaker, setSpeaker] = useState('');
+  const [method, setMethod] = useState('embedding');
   const [data, setData] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +60,7 @@ export default function SearchView() {
       const response = await fetch(`${API_BASE}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: nextQuery, top_k: 10, speaker: speaker.trim() || null }),
+        body: JSON.stringify({ query: nextQuery, top_k: 10, speaker: speaker.trim() || null, method }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? 'Search failed');
@@ -92,18 +104,15 @@ export default function SearchView() {
             onChange={(event) => setSpeaker(event.target.value)}
           />
         </div>
-        <div className="flex bg-surface-container p-1 rounded-xl border border-border-subtle shadow-inner">
-          {['Semantic', 'FAISS', 'AMI'].map((mode) => (
-            <span
-              key={mode}
-              className={`px-5 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest ${
-                mode === 'Semantic' ? 'bg-primary-container text-white shadow-lg' : 'text-on-surface-variant'
-              }`}
-            >
-              {mode}
-            </span>
+        <select
+          className="bg-surface-container border border-border-subtle rounded-xl px-4 py-3 text-xs font-black uppercase tracking-wider text-on-surface outline-none"
+          value={method}
+          onChange={(event) => setMethod(event.target.value)}
+        >
+          {SEARCH_METHODS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
           ))}
-        </div>
+        </select>
         <button className="px-5 py-3 bg-primary-container text-white rounded-xl flex items-center gap-2 hover:opacity-90 transition-all active:scale-95 text-xs font-bold uppercase tracking-wider shadow-lg">
           <Search className="w-4 h-4" />
           Search
@@ -118,7 +127,7 @@ export default function SearchView() {
               <span className="italic tracking-tight">"{data?.query ?? query}"</span>
             </h1>
             <p className="text-on-surface-variant text-sm mt-1 opacity-70">
-              {loading ? 'Searching FAISS index...' : `${visibleResults.length} AMI meetings returned${data ? ` in ${data.latency_ms} ms` : ''}.`}
+              {loading ? 'Searching FAISS index...' : `${visibleResults.length} AMI meetings returned${data ? ` in ${data.latency_ms} ms with ${data.method}` : ''}.`}
             </p>
           </div>
           <div className="flex gap-2">
@@ -138,7 +147,7 @@ export default function SearchView() {
           {[
             { icon: Database, label: 'Source: AMI Corpus' },
             { icon: Brain, label: 'Embedding: all-MiniLM-L6-v2' },
-            { icon: Sparkles, label: 'Index: FAISS cosine/IP' },
+            { icon: Sparkles, label: `Method: ${data?.method ?? method}` },
           ].map((tag) => (
             <span key={tag.label} className="px-3 py-1 bg-surface-container-high rounded-full text-[11px] font-bold flex items-center gap-2 border border-border-subtle text-on-surface shadow-sm">
               <tag.icon className="w-3.5 h-3.5 text-primary" />

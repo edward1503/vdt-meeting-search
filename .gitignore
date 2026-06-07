@@ -1,17 +1,55 @@
+# Python
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.playwright-cli/
-.venv/
+*$py.class
+*.so
+.Python
+env/
 venv/
-node_modules/
-frontend/node_modules/
-frontend/dist/
+.venv/
+*.egg-info/
+dist/
+build/
 
-# Generated pipeline artifacts. Keep raw data and eval fixtures versioned.
-data/index/
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Data (large files)
+data/raw/
 data/processed/
+data/processed_sample/
+data/*.zip
+*.csv
+*.json
+!evaluation/*.json
+!docs/*.json
 
-# External AMI download kept locally for indexing.
-data/ami_public_manual_1.6.2/
-data/raw/ami_public_manual_1.6.2/
+# Models
+models/
+*.bin
+*.pt
+*.onnx
+
+# Elasticsearch
+esdata/
+
+# Docker
+docker/volumes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/

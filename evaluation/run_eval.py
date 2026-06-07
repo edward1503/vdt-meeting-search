@@ -8,7 +8,7 @@ from src.core.config import ROOT_DIR
 from src.search.searcher import MeetingSearcher
 
 
-def evaluate(qrels_path: Path, top_k: int = 10) -> dict[str, float]:
+def evaluate(qrels_path: Path, top_k: int = 10, method: str = "embedding") -> dict[str, float]:
     searcher = MeetingSearcher()
     queries = json.loads(qrels_path.read_text(encoding="utf-8"))
     precision_total = 0.0
@@ -17,7 +17,7 @@ def evaluate(qrels_path: Path, top_k: int = 10) -> dict[str, float]:
 
     for item in queries:
         relevant = set(item["relevant_meeting_ids"])
-        results = searcher.search(item["query"], top_k=top_k)["results"]
+        results = searcher.search(item["query"], top_k=top_k, method=method)["results"]
         returned = [result["meeting_id"] for result in results]
         hits = [meeting_id for meeting_id in returned if meeting_id in relevant]
         precision_total += len(hits) / max(1, top_k)
@@ -26,6 +26,7 @@ def evaluate(qrels_path: Path, top_k: int = 10) -> dict[str, float]:
 
     count = max(1, len(queries))
     return {
+        "method": method,
         f"precision@{top_k}": precision_total / count,
         f"recall@{top_k}": recall_total / count,
         f"mrr@{top_k}": reciprocal_total / count,
@@ -37,10 +38,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate meeting search")
     parser.add_argument("--qrels", type=Path, default=ROOT_DIR / "data" / "eval" / "sample_qrels.json")
     parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument("--method", default="embedding")
     args = parser.parse_args()
-    print(json.dumps(evaluate(args.qrels, args.top_k), indent=2))
+    print(json.dumps(evaluate(args.qrels, args.top_k, args.method), indent=2))
 
 
 if __name__ == "__main__":
     main()
-
