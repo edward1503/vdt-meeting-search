@@ -1,0 +1,173 @@
+{
+  "reports": [
+    {
+      "dataset_id": "nano-beir/hotpotqa",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5090,
+        "queries_count": 50,
+        "qrels_count": 100
+      },
+      "queries": {
+        "iterated": 50,
+        "token_lengths": {
+          "min": 8,
+          "p50": 15,
+          "p90": 23,
+          "p95": 26,
+          "p99": 28,
+          "max": 28,
+          "avg": 14.92
+        },
+        "first_token_top10": {
+          "what": 12,
+          "who": 7,
+          "the": 6,
+          "which": 5,
+          "where": 2,
+          "are": 2,
+          "jal": 1,
+          "both": 1,
+          "kete": 1,
+          "ou812": 1
+        },
+        "samples": [
+          {
+            "query_id": "5ae5669755429960a22e02ec",
+            "text": "Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?"
+          },
+          {
+            "query_id": "5a811667554299260e20a23d",
+            "text": "What occupations do both Ian Hunter and Rob Thomas have?"
+          },
+          {
+            "query_id": "5abdf8c45542993f32c2a072",
+            "text": "The Death of Cook depicts the death of James Cook at a bay on what coast?"
+          },
+          {
+            "query_id": "5adbd70c55429947ff173843",
+            "text": "What is the title of the memoir written by the honoree of the Black and White Ball?"
+          },
+          {
+            "query_id": "5ae0ae4555429945ae959419",
+            "text": "Jal Pari, which translated in another language refers to which legendary creature which are sometimes associated with perilous events such as floods, storm,s shipwrecks, and drownings?"
+          }
+        ]
+      },
+      "qrels": {
+        "positive_qrel_queries": 50,
+        "unique_positive_doc_ids": 100,
+        "support_docs_per_query": {
+          "min": 2,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2,
+          "p99": 2,
+          "max": 2,
+          "avg": 2
+        },
+        "support_docs_histogram": {
+          "2": 50
+        },
+        "relevance_values": {
+          "1.0": 100
+        },
+        "sample_supports": [
+          {
+            "query_id": "5ae5669755429960a22e02ec",
+            "support_doc_ids": [
+              "49892372",
+              "46979246"
+            ]
+          },
+          {
+            "query_id": "5a811667554299260e20a23d",
+            "support_doc_ids": [
+              "6668827",
+              "580274"
+            ]
+          },
+          {
+            "query_id": "5abdf8c45542993f32c2a072",
+            "support_doc_ids": [
+              "838269",
+              "1214610"
+            ]
+          },
+          {
+            "query_id": "5adbd70c55429947ff173843",
+            "support_doc_ids": [
+              "7727406",
+              "408127"
+            ]
+          },
+          {
+            "query_id": "5ae0ae4555429945ae959419",
+            "support_doc_ids": [
+              "6673260",
+              "76592"
+            ]
+          }
+        ]
+      },
+      "documents": {
+        "iterated": 5090,
+        "text_token_lengths": {
+          "min": 3,
+          "p50": 49,
+          "p90": 110,
+          "p95": 134,
+          "p99": 192,
+          "max": 345,
+          "avg": 57.26
+        },
+        "title_token_lengths": {
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "avg": 0
+        },
+        "empty_title_count": 5090,
+        "empty_text_count": 0,
+        "samples": [
+          {
+            "doc_id": "974",
+            "title": "",
+            "text_preview": "Augusta Ada King-Noel, Countess of Lovelace (\"née\" Byron; 10 December 1815 – 27 November 1852) was an English mathematician and writer, chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine",
+            "text_tokens": 88
+          },
+          {
+            "doc_id": "4009",
+            "title": "",
+            "text_preview": "Bigfoot (also known as Sasquatch) is a cryptid which supposedly is a simian-like creature of American folklore that is said to inhabit forests, especially in the Pacific Northwest. Bigfoot is usually described as a large, hairy, bipedal humanoid. The term \"sasquatch\" is an Anglicized derivative of t",
+            "text_tokens": 50
+          },
+          {
+            "doc_id": "4955",
+            "title": "",
+            "text_preview": "A bokken (木剣 , \"bok(u)\", \"wood\", and \"ken\", \"sword\") (or a \"bokutō\" 木刀 , as they are instead called in Japan) is a Japanese wooden sword used for training. It is usually the size and shape of a \"katana\", but is sometimes shaped like other swords, such as the \"wakizashi\" and \"tantō\". Some ornamental ",
+            "text_tokens": 70
+          },
+          {
+            "doc_id": "5828",
+            "title": "",
+            "text_preview": "Cryptozoology is a pseudoscience that aims to prove the existence of entities from the folklore record, such as Bigfoot or chupacabras, as well as animals otherwise considered extinct, such as dinosaurs. Cryptozoologists refer to these entities as \"cryptids\". Because it does not follow the scientifi",
+            "text_tokens": 64
+          },
+          {
+            "doc_id": "6226",
+            "title": "",
+            "text_preview": "Claudio Giovanni Antonio Monteverdi (] ; 15 May 1567 (baptized) – 29 November 1643) was an Italian composer, string player and choirmaster. A composer of both secular and sacred music, and a pioneer in the development of opera, he is considered a crucial transitional figure between the Renaissance a",
+            "text_tokens": 55
+          }
+        ]
+      },
+      "elapsed_sec": 0.249
+    }
+  ]
+}

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HotpotQA Elasticsearch Retrieval</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --line: #dbe3ef;
+      --text: #172033;
+      --muted: #667085;
+      --blue: #2563eb;
+      --green: #15803d;
+      --amber: #b45309;
+      --purple: #6d28d9;
+      --red: #b91c1c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+    header { position: sticky; top: 0; z-index: 10; background: var(--panel); border-bottom: 1px solid var(--line); }
+    .topbar { max-width: 1220px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 18px; }
+    h1 { font-size: 18px; margin: 0; min-width: 260px; }
+    nav { display: flex; gap: 6px; }
+    .tab { border: 1px solid transparent; background: transparent; color: var(--muted); padding: 9px 12px; border-radius: 6px; cursor: pointer; font-weight: 700; }
+    .tab.active { background: #e8f0ff; border-color: #b8cdfd; color: var(--blue); }
+    main { max-width: 1220px; margin: 0 auto; padding: 18px 20px 36px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .toolbar { display: grid; grid-template-columns: 1fr 190px 86px 110px; gap: 10px; margin-bottom: 14px; }
+    .query-toolbar { display: grid; grid-template-columns: 1fr 120px; gap: 10px; margin-bottom: 14px; }
+    input, select, button { min-height: 42px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 12px; font-size: 14px; background: white; color: var(--text); }
+    button { background: var(--blue); color: white; border-color: var(--blue); font-weight: 700; cursor: pointer; }
+    button.secondary { background: white; color: var(--blue); }
+    .grid { display: grid; gap: 14px; }
+    .two-col { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--line); }
+    .panel-title { font-size: 14px; font-weight: 800; }
+    .panel-body { padding: 14px; }
+    .status { color: var(--muted); font-size: 13px; }
+    .error { color: var(--red); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border-bottom: 1px solid #edf1f7; padding: 10px 9px; text-align: left; vertical-align: top; }
+    th { color: #475467; font-size: 12px; background: #f8fafc; position: sticky; top: 53px; z-index: 5; }
+    tr.clickable { cursor: pointer; }
+    tr.clickable:hover { background: #f8fbff; }
+    .results { display: grid; gap: 10px; }
+    .result { border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: white; }
+    .result-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .doc-title { font-weight: 800; margin: 6px 0; }
+    .doc-text { margin: 0; white-space: pre-wrap; line-height: 1.45; color: #334155; }
+    .badge { display: inline-flex; align-items: center; min-height: 22px; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; background: #eef2ff; color: #3730a3; }
+    .badge.bm25 { background: #e0f2fe; color: #075985; }
+    .badge.dense { background: #f3e8ff; color: var(--purple); }
+    .badge.hybrid { background: #dcfce7; color: var(--green); }
+    .badge.iterative { background: #ffedd5; color: var(--amber); }
+    .badge.gold { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+    .muted { color: var(--muted); }
+    .mono { font-family: Consolas, monospace; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .card { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+    .card-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+    .card-value { margin-top: 8px; font-size: 24px; font-weight: 800; }
+    .card-note { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .detail-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 14px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    @media (max-width: 860px) {
+      .topbar { align-items: flex-start; flex-direction: column; }
+      h1 { min-width: auto; }
+      .toolbar, .query-toolbar, .two-col, .cards { grid-template-columns: 1fr; }
+      th { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topbar">
+      <h1>HotpotQA Elasticsearch Retrieval</h1>
+      <nav>
+        <button class="tab active" data-tab="search">Search</button>
+        <button class="tab" data-tab="queries">Queries</button>
+        <button class="tab" data-tab="benchmark">Benchmark</button>
+      </nav>
+      <div id="apiStatus" class="status">API: checking...</div>
+    </div>
+  </header>
+
+  <main>
+    <section id="screen-search" class="screen active">
+      <div class="toolbar">
+        <input id="queryInput" value="What government position was held by the woman who portrayed Corliss Archer in the film Kiss and Tell?" />
+        <select id="methodSelect">
+          <option value="es_bm25">ES BM25</option>
+          <option value="es_dense">ES Dense BGE</option>
+          <option value="es_hybrid" selected>ES Hybrid RRF</option>
+          <option value="es_iterative_hybrid">ES Iterative Hybrid</option>
+        </select>
+        <select id="topKSelect">
+          <option value="5">top 5</option>
+          <option value="10" selected>top 10</option>
+          <option value="20">top 20</option>
+        </select>
+        <button id="searchButton">Search</button>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Search Results</div>
+          <div id="searchStatus" class="status">Ready</div>
+        </div>
+        <div class="panel-body">
+          <div id="results" class="results"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-queries" class="screen">
+      <div class="query-toolbar">
+        <input id="queryFilter" placeholder="Filter query text or doc id..." />
+        <button class="secondary" id="reloadQueriesButton">Reload</button>
+      </div>
+      <div class="grid two-col">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">Query List</div>
+            <div id="queriesStatus" class="status">Not loaded</div>
+          </div>
+          <div class="panel-body" style="padding:0; max-height: calc(100vh - 190px); overflow:auto;">
+            <table>
+              <thead><tr><th>query_id</th><th>query</th><th>supported docs</th><th></th></tr></thead>
+              <tbody id="queriesTable"></tbody>
+            </table>
+          </div>
+        </div>
+        <aside class="panel">
+          <div class="panel-head"><div class="panel-title">Query Detail</div></div>
+          <div class="panel-body" id="queryDetail">
+            <div class="muted">Select a query to inspect supported doc ids.</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="screen-benchmark" class="screen">
+      <div class="cards" id="metricCards"></div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Benchmark Results</div>
+          <div id="benchmarkStatus" class="status">Not loaded</div>
+        </div>
+        <div class="panel-body" style="padding:0; overflow:auto;">
+          <table>
+            <thead>
+              <tr><th>Method</th><th>Precision@10</th><th>Recall@10</th><th>MRR@10</th><th>nDCG@10</th><th>Full-support@10</th><th>p50</th><th>p95</th><th>QPS</th></tr>
+            </thead>
+            <tbody id="benchmarkTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = 'http://127.0.0.1:8001';
+    const state = { queries: [], benchmark: null, selectedQuery: null };
+
+    const methodLabels = {
+      es_bm25: 'ES BM25',
+      es_dense: 'ES Dense BGE',
+      es_hybrid: 'ES Hybrid RRF',
+      es_iterative_hybrid: 'ES Iterative Hybrid'
+    };
+
+    document.querySelectorAll('.tab').forEach(button => {
+      button.addEventListener('click', () => showTab(button.dataset.tab));
+    });
+    document.getElementById('searchButton').addEventListener('click', runSearch);
+    document.getElementById('reloadQueriesButton').addEventListener('click', loadQueries);
+    document.getElementById('queryFilter').addEventListener('input', renderQueries);
+    document.getElementById('queryInput').addEventListener('keydown', event => {
+      if (event.key === 'Enter') runSearch();
+    });
+
+    checkApi();
+    loadQueries();
+    loadBenchmark();
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab').forEach(item => item.classList.toggle('active', item.dataset.tab === tab));
+      document.querySelectorAll('.screen').forEach(item => item.classList.remove('active'));
+      document.getElementById(`screen-${tab}`).classList.add('active');
+    }
+
+    async function apiGet(path) {
+      const response = await fetch(`${API_BASE}${path}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || `GET ${path} failed`);
+      return payload;
+    }
+
+    async function checkApi() {
+      try {
+        const stats = await apiGet('/stats');
+        document.getElementById('apiStatus').textContent = `API: ${stats.backend} / ${stats.index}`;
+      } catch (error) {
+        document.getElementById('apiStatus').textContent = `API: ${error.message}`;
+        document.getElementById('apiStatus').classList.add('error');
+      }
+    }
+
+    async function runSearch() {
+      const query = document.getElementById('queryInput').value.trim();
+      const method = document.getElementById('methodSelect').value;
+      const topK = Number(document.getElementById('topKSelect').value);
+      if (!query) return;
+      const status = document.getElementById('searchStatus');
+      status.classList.remove('error');
+      status.textContent = 'Searching...';
+      document.getElementById('results').innerHTML = '';
+      try {
+        const response = await fetch(`${API_BASE}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, method, top_k: topK })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || 'Search failed');
+        status.textContent = `${payload.results.length} results in ${formatMs(payload.latency_ms)} using ${methodLabels[payload.method] || payload.method}`;
+        const goldIds = state.selectedQuery && state.selectedQuery.query === query ? state.selectedQuery.support_doc_ids : [];
+        renderResults(payload.results, goldIds);
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add('error');
+      }
+    }
+
+    function renderResults(results, goldIds) {
+      const goldSet = new Set(goldIds || []);
+      document.getElementById('results').innerHTML = results.map(item => {
+        const methodClass = sourceClass(item.source);
+        const isGold = goldSet.has(String(item.doc_id));
+        return `
+          <article class="result">
+            <div class="result-top">
+              <span class="badge ${methodClass}">rank ${item.rank}</span>
+              <span class="badge">hop ${item.hop}</span>
+              <span class="badge ${methodClass}">${escapeHtml(item.source || '')}</span>
+              ${isGold ? '<span class="badge gold">gold support</span>' : ''}
+              <span class="muted mono">${escapeHtml(item.doc_id)}</span>
+              <span class="muted">score ${Number(item.score).toFixed(5)}</span>
+            </div>
+            <div class="doc-title">${escapeHtml(item.title || '(untitled)')}</div>
+            <p class="doc-text">${escapeHtml(item.text || '')}</p>
+          </article>
+        `;
+      }).join('') || '<div class="muted">No results.</div>';
+    }
+
+    async function loadQueries() {
+      const status = document.getElementById('queriesStatus');
+      status.classList.remove('error');
+      status.textContent = 'Loading...';
+      try {
+        const payload = await apiGet('/queries');
+        state.queries = payload.queries || [];
+        status.textContent = `${state.queries.length} queries`;
+        renderQueries();
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add('error');
+      }
+    }
+
+    function renderQueries() {
+      const filter = document.getElementById('queryFilter').value.trim().toLowerCase();
+      const rows = state.queries.filter(row => {
+        const haystack = `${row.query_id} ${row.query} ${(row.support_doc_ids || []).join(' ')}`.toLowerCase();
+        return !filter || haystack.includes(filter);
+      }).slice(0, 200);
+      document.getElementById('queriesTable').innerHTML = rows.map(row => `
+        <tr class="clickable" data-query-id="${escapeAttr(row.query_id)}">
+          <td class="mono">${escapeHtml(row.query_id)}</td>
+          <td>${escapeHtml(row.query)}</td>
+          <td>${(row.support_doc_ids || []).map(id => `<span class="badge gold mono">${escapeHtml(id)}</span>`).join(' ')}</td>
+          <td><button class="secondary" data-action="search" data-query-id="${escapeAttr(row.query_id)}">Search</button></td>
+        </tr>
+      `).join('');
+      document.querySelectorAll('[data-query-id]').forEach(node => {
+        node.addEventListener('click', event => {
+          const id = event.currentTarget.dataset.queryId;
+          selectQuery(id);
+        });
+      });
+      document.querySelectorAll('[data-action="search"]').forEach(button => {
+        button.addEventListener('click', event => {
+          event.stopPropagation();
+          selectQuery(event.currentTarget.dataset.queryId);
+          searchSelected('es_hybrid');
+        });
+      });
+    }
+
+    function selectQuery(queryId) {
+      const row = state.queries.find(item => item.query_id === queryId);
+      if (!row) return;
+      state.selectedQuery = row;
+      document.getElementById('queryDetail').innerHTML = `
+        <div class="muted mono">${escapeHtml(row.query_id)}</div>
+        <h3 style="font-size:15px; line-height:1.35; margin:10px 0;">${escapeHtml(row.query)}</h3>
+        <div class="muted">Supported docs (${row.support_doc_count})</div>
+        <div class="detail-list">${row.support_doc_ids.map(id => `<span class="badge gold mono">${escapeHtml(id)}</span>`).join('')}</div>
+        <div class="actions">
+          <button data-detail-search="es_hybrid">Search Hybrid</button>
+          <button class="secondary" data-detail-search="es_iterative_hybrid">Search Iterative</button>
+        </div>
+      `;
+      document.querySelectorAll('[data-detail-search]').forEach(button => {
+        button.addEventListener('click', () => searchSelected(button.dataset.detailSearch));
+      });
+    }
+
+    function searchSelected(method) {
+      if (!state.selectedQuery) return;
+      document.getElementById('queryInput').value = state.selectedQuery.query;
+      document.getElementById('methodSelect').value = method;
+      showTab('search');
+      runSearch();
+    }
+
+    async function loadBenchmark() {
+      const status = document.getElementById('benchmarkStatus');
+      status.textContent = 'Loading...';
+      try {
+        state.benchmark = await apiGet('/benchmark');
+        status.textContent = `${state.benchmark.config?.queries || 0} queries, top ${state.benchmark.config?.top_k || 10}`;
+        renderBenchmark();
+      } catch (error) {
+        status.textContent = error.message;
+        status.classList.add('error');
+      }
+    }
+
+    function renderBenchmark() {
+      const results = state.benchmark?.results || [];
+      const metrics = results.map(item => ({ method: item.method, ...item.metrics }));
+      const bestRecall = maxBy(metrics, 'recall@10');
+      const bestNdcg = maxBy(metrics, 'ndcg@10');
+      const bestFull = maxBy(metrics, 'full_support_recall@10');
+      const fastest = minBy(metrics, 'latency_p50_ms');
+      document.getElementById('metricCards').innerHTML = [
+        card('Best Recall@10', bestRecall, 'recall@10'),
+        card('Best nDCG@10', bestNdcg, 'ndcg@10'),
+        card('Best Full-support', bestFull, 'full_support_recall@10'),
+        card('Fastest p50', fastest, 'latency_p50_ms', true)
+      ].join('');
+      document.getElementById('benchmarkTable').innerHTML = metrics.map(row => `
+        <tr>
+          <td><span class="badge ${sourceClass(row.method)}">${escapeHtml(row.method)}</span></td>
+          <td>${fmt(row['precision@10'])}</td>
+          <td>${fmt(row['recall@10'])}</td>
+          <td>${fmt(row['mrr@10'])}</td>
+          <td>${fmt(row['ndcg@10'])}</td>
+          <td>${fmt(row['full_support_recall@10'])}</td>
+          <td>${formatMs(row.latency_p50_ms)}</td>
+          <td>${formatMs(row.latency_p95_ms)}</td>
+          <td>${fmt(row.qps)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function card(label, row, key, isMs = false) {
+      if (!row) return '';
+      return `<div class="card"><div class="card-label">${label}</div><div class="card-value">${isMs ? formatMs(row[key]) : fmt(row[key])}</div><div class="card-note">${row.method}</div></div>`;
+    }
+
+    function sourceClass(value) {
+      const text = String(value || '');
+      if (text.includes('iterative')) return 'iterative';
+      if (text.includes('hybrid')) return 'hybrid';
+      if (text.includes('dense')) return 'dense';
+      if (text.includes('bm25')) return 'bm25';
+      return '';
+    }
+    function maxBy(rows, key) { return rows.reduce((best, row) => best && best[key] >= row[key] ? best : row, null); }
+    function minBy(rows, key) { return rows.reduce((best, row) => best && best[key] <= row[key] ? best : row, null); }
+    function fmt(value) { return Number(value || 0).toFixed(4).replace(/0+$/, '').replace(/\.$/, ''); }
+    function formatMs(value) { return `${Number(value || 0).toFixed(1)} ms`; }
+    function escapeHtml(value) { return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch])); }
+    function escapeAttr(value) { return escapeHtml(value).replace(/`/g, '&#96;'); }
+  </script>
+</body>
+</html>

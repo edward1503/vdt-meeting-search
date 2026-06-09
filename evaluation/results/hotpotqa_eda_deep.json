@@ -1,0 +1,732 @@
+{
+  "reports": [
+    {
+      "dataset_id": "nano-beir/hotpotqa",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5090,
+        "queries_count": 50,
+        "qrels_count": 100
+      },
+      "queries": {
+        "iterated": 50,
+        "token_lengths": {
+          "min": 8,
+          "p50": 15,
+          "p90": 24,
+          "p95": 27,
+          "p99": 28,
+          "max": 28,
+          "avg": 15.2
+        },
+        "first_token_top10": {
+          "what": 12,
+          "who": 7,
+          "the": 6,
+          "which": 5,
+          "where": 2,
+          "are": 2,
+          "jal": 1,
+          "both": 1,
+          "kete": 1,
+          "ou812": 1
+        },
+        "question_patterns": {
+          "what": 21,
+          "which/bridge": 13,
+          "explicit relation clue": 11,
+          "who": 9,
+          "comparison/both": 6,
+          "other": 3,
+          "where": 2,
+          "how": 1
+        },
+        "samples": [
+          {
+            "query_id": "5ae5669755429960a22e02ec",
+            "text": "Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?",
+            "tokens": 28,
+            "labels": [
+              "which/bridge"
+            ]
+          },
+          {
+            "query_id": "5a811667554299260e20a23d",
+            "text": "What occupations do both Ian Hunter and Rob Thomas have?",
+            "tokens": 10,
+            "labels": [
+              "comparison/both",
+              "what",
+              "explicit relation clue"
+            ]
+          },
+          {
+            "query_id": "5abdf8c45542993f32c2a072",
+            "text": "The Death of Cook depicts the death of James Cook at a bay on what coast?",
+            "tokens": 16,
+            "labels": [
+              "what",
+              "explicit relation clue"
+            ]
+          },
+          {
+            "query_id": "5adbd70c55429947ff173843",
+            "text": "What is the title of the memoir written by the honoree of the Black and White Ball?",
+            "tokens": 17,
+            "labels": [
+              "what",
+              "explicit relation clue"
+            ]
+          },
+          {
+            "query_id": "5ae0ae4555429945ae959419",
+            "text": "Jal Pari, which translated in another language refers to which legendary creature which are sometimes associated with perilous events such as floods, storm,s shipwrecks, and drownings?",
+            "tokens": 27,
+            "labels": [
+              "which/bridge",
+              "explicit relation clue"
+            ]
+          },
+          {
+            "query_id": "5a89f68f5542992e4fca84b6",
+            "text": "What kind of person of authority does Governor of Sheerness and Stapleton Cotton, 1st Viscount Combermere have in common?",
+            "tokens": 19,
+            "labels": [
+              "what"
+            ]
+          },
+          {
+            "query_id": "5aba67c255429955dce3ee10",
+            "text": "Both The Badgeman and +44 were bands concieved in which country?",
+            "tokens": 11,
+            "labels": [
+              "comparison/both",
+              "which/bridge"
+            ]
+          },
+          {
+            "query_id": "5ab4f7fc5542991779162d43",
+            "text": "Kete Krachi is a town in what region?",
+            "tokens": 8,
+            "labels": [
+              "what"
+            ]
+          }
+        ]
+      },
+      "schema": {
+        "query": {
+          "type": "GenericQuery",
+          "fields": [
+            "query_id",
+            "text"
+          ],
+          "values": {
+            "query_id": "5ae5669755429960a22e02ec",
+            "text": "Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?"
+          },
+          "repr": "GenericQuery(query_id='5ae5669755429960a22e02ec', text='Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?')"
+        },
+        "qrel": {
+          "type": "TrecQrel",
+          "fields": [
+            "query_id",
+            "doc_id",
+            "relevance",
+            "iteration"
+          ],
+          "values": {
+            "query_id": "5ae5669755429960a22e02ec",
+            "doc_id": "49892372",
+            "relevance": "1",
+            "iteration": "0"
+          },
+          "repr": "TrecQrel(query_id='5ae5669755429960a22e02ec', doc_id='49892372', relevance=1, iteration='0')"
+        },
+        "document": {
+          "type": "GenericDoc",
+          "fields": [
+            "doc_id",
+            "text"
+          ],
+          "values": {
+            "doc_id": "974",
+            "text": "Augusta Ada King-Noel, Countess of Lovelace (\"née\" Byron; 10 December 1815 – 27 November 1852) was an English mathematician and writer, chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation, and created th..."
+          },
+          "repr": "GenericDoc(doc_id='974', text='Augusta Ada King-Noel, Countess of Lovelace (\"née\" Byron; 10 December 1815\\xa0– 27 November 1852) was an English mathematician and writer, chiefly known for her work on Charles Babbage\\'s proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation, and created the first algorithm intended to be carried out by such a machine. As a result, she is often regarded as the first to recognise the full potential of a \"computing machine\" and the first computer programmer.')"
+        }
+      },
+      "field_coverage": {
+        "query": {
+          "query_id": {
+            "present": 50,
+            "non_empty": 50,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          },
+          "text": {
+            "present": 50,
+            "non_empty": 50,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          }
+        },
+        "qrel": {
+          "query_id": {
+            "present": 100,
+            "non_empty": 100,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          },
+          "doc_id": {
+            "present": 100,
+            "non_empty": 100,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          },
+          "relevance": {
+            "present": 100,
+            "non_empty": 100,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          },
+          "iteration": {
+            "present": 100,
+            "non_empty": 100,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          }
+        },
+        "document": {
+          "doc_id": {
+            "present": 5090,
+            "non_empty": 5090,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          },
+          "text": {
+            "present": 5090,
+            "non_empty": 5090,
+            "missing": 0,
+            "empty": 0,
+            "non_empty_ratio": 1.0
+          }
+        }
+      },
+      "qrels": {
+        "positive_qrel_queries": 50,
+        "unique_positive_doc_ids": 100,
+        "support_docs_per_query": {
+          "min": 2,
+          "p50": 2,
+          "p90": 2,
+          "p95": 2,
+          "p99": 2,
+          "max": 2,
+          "avg": 2
+        },
+        "support_docs_histogram": {
+          "2": 50
+        },
+        "relevance_values": {
+          "1.0": 100
+        },
+        "sample_supports": [
+          {
+            "query_id": "5ae5669755429960a22e02ec",
+            "support_doc_ids": [
+              "49892372",
+              "46979246"
+            ]
+          },
+          {
+            "query_id": "5a811667554299260e20a23d",
+            "support_doc_ids": [
+              "6668827",
+              "580274"
+            ]
+          },
+          {
+            "query_id": "5abdf8c45542993f32c2a072",
+            "support_doc_ids": [
+              "838269",
+              "1214610"
+            ]
+          },
+          {
+            "query_id": "5adbd70c55429947ff173843",
+            "support_doc_ids": [
+              "7727406",
+              "408127"
+            ]
+          },
+          {
+            "query_id": "5ae0ae4555429945ae959419",
+            "support_doc_ids": [
+              "6673260",
+              "76592"
+            ]
+          },
+          {
+            "query_id": "5a89f68f5542992e4fca84b6",
+            "support_doc_ids": [
+              "29728545",
+              "2399083"
+            ]
+          },
+          {
+            "query_id": "5aba67c255429955dce3ee10",
+            "support_doc_ids": [
+              "33733292",
+              "3785255"
+            ]
+          },
+          {
+            "query_id": "5ab4f7fc5542991779162d43",
+            "support_doc_ids": [
+              "4087014",
+              "4143197"
+            ]
+          }
+        ]
+      },
+      "documents": {
+        "iterated": 5090,
+        "text_token_lengths": {
+          "min": 4,
+          "p50": 50,
+          "p90": 113,
+          "p95": 136,
+          "p99": 194,
+          "max": 352,
+          "avg": 58.4
+        },
+        "title_token_lengths": {
+          "min": 0,
+          "p50": 0,
+          "p90": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "avg": 0
+        },
+        "first_sentence_token_lengths": {
+          "min": 0,
+          "p50": 19,
+          "p90": 33,
+          "p95": 39,
+          "p99": 51,
+          "max": 80,
+          "avg": 20.272
+        },
+        "empty_title_count": 5090,
+        "empty_text_count": 0,
+        "samples": [
+          {
+            "doc_id": "974",
+            "title": "",
+            "text_preview": "Augusta Ada King-Noel, Countess of Lovelace (\"née\" Byron; 10 December 1815 – 27 November 1852) was an English mathematician and writer, chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation, and created the first algorithm intended to be carried out by such a machi...",
+            "text_tokens": 91
+          },
+          {
+            "doc_id": "4009",
+            "title": "",
+            "text_preview": "Bigfoot (also known as Sasquatch) is a cryptid which supposedly is a simian-like creature of American folklore that is said to inhabit forests, especially in the Pacific Northwest. Bigfoot is usually described as a large, hairy, bipedal humanoid. The term \"sasquatch\" is an Anglicized derivative of the Halkomelem word \"sásq'ets\".",
+            "text_tokens": 53
+          },
+          {
+            "doc_id": "4955",
+            "title": "",
+            "text_preview": "A bokken (木剣 , \"bok(u)\", \"wood\", and \"ken\", \"sword\") (or a \"bokutō\" 木刀 , as they are instead called in Japan) is a Japanese wooden sword used for training. It is usually the size and shape of a \"katana\", but is sometimes shaped like other swords, such as the \"wakizashi\" and \"tantō\". Some ornamental bokken are decorated with mother-of-pearl work and elaborate carvings. Sometimes it is spelled \"boken\" in English.",
+            "text_tokens": 69
+          },
+          {
+            "doc_id": "5828",
+            "title": "",
+            "text_preview": "Cryptozoology is a pseudoscience that aims to prove the existence of entities from the folklore record, such as Bigfoot or chupacabras, as well as animals otherwise considered extinct, such as dinosaurs. Cryptozoologists refer to these entities as \"cryptids\". Because it does not follow the scientific method, cryptozoology is considered a pseudoscience by the academic world: it is neither a branch of zoology nor fo...",
+            "text_tokens": 64
+          },
+          {
+            "doc_id": "6226",
+            "title": "",
+            "text_preview": "Claudio Giovanni Antonio Monteverdi (] ; 15 May 1567 (baptized) – 29 November 1643) was an Italian composer, string player and choirmaster. A composer of both secular and sacred music, and a pioneer in the development of opera, he is considered a crucial transitional figure between the Renaissance and the Baroque periods of music history.",
+            "text_tokens": 52
+          },
+          {
+            "doc_id": "6542",
+            "title": "",
+            "text_preview": "Czesław Miłosz ( ; 30 June 1911 – 14 August 2004) was a Polish poet, prose writer, translator and diplomat. His World War II-era sequence \"The World\" is a collection of twenty \"naïve\" poems. Following the war, he served as Polish cultural attaché in Paris and Washington, D.C., then in 1951 defected to the West. His nonfiction book \"The Captive Mind\" (1953) became a classic of anti-Stalinism. From 1961 to 1998 he w...",
+            "text_tokens": 142
+          },
+          {
+            "doc_id": "7376",
+            "title": "",
+            "text_preview": "The cosmic microwave background (CMB) is electromagnetic radiation left over from an early stage of the universe in Big Bang cosmology. In older literature, the CMB is also variously known as cosmic microwave background radiation (CMBR) or \"relic radiation\". The CMB is a faint cosmic background radiation filling all space that is an important source of data on the early universe because it is the oldest electromag...",
+            "text_tokens": 167
+          },
+          {
+            "doc_id": "7891",
+            "title": "",
+            "text_preview": "David Keith Lynch (born January 20, 1946) is an American director, screenwriter, producer, painter, musician, actor, and photographer. He has been described by \"The Guardian\" as \"the most important director of this era\". AllMovie called him \"the Renaissance man of modern American filmmaking\", while the success of his films has led to him being labelled \"the first popular Surrealist\".",
+            "text_tokens": 59
+          }
+        ]
+      },
+      "support_examples": [
+        {
+          "query_id": "5ae5669755429960a22e02ec",
+          "query": "Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "49892372",
+              "title": "",
+              "text_preview": "Vichy Republican is a term that emerged on social media in 2016 in regards to the United States Presidential campaign ofDonald Trump. To Trump opponents, it refers to members of the Republican Party that have chosen to support Donald Trump's candidacy.",
+              "text_tokens": 42,
+              "query_token_overlap": 0.462
+            },
+            {
+              "doc_id": "46979246",
+              "title": "",
+              "text_preview": "The 2016 presidential campaign of Donald Trump, an American businessman, television personality, and author, was formally launched on June 16, 2015, at Trump Tower in New York City. Trump was the Republican nominee for President of the United States in the 2016 election, having won the most state primaries, caucuses, and delegates at the 2016 Republican National Convention. He chose Mike Pence, the sitting Governor of Indiana, as his vice presidential running mate. On November 8, 2016, Trump ...",
+              "text_tokens": 90,
+              "query_token_overlap": 0.692
+            }
+          ]
+        },
+        {
+          "query_id": "5a811667554299260e20a23d",
+          "query": "What occupations do both Ian Hunter and Rob Thomas have?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "6668827",
+              "title": "",
+              "text_preview": "Ian Hunter Patterson (born 3 June 1939), known as Ian Hunter, is a British singer-songwriter who is best known as the lead singer of the English rock band Mott the Hoople, from its inception in 1969 to its dissolution in 1974, and at the time of its 2009 and 2013 reunions. Hunter was a musician and songwriter before joining Mott the Hoople, and continued in this vein after he left the band. He embarked on a solo career despite ill health and disillusionment with commercial success, and often ...",
+              "text_tokens": 111,
+              "query_token_overlap": 0.3
+            },
+            {
+              "doc_id": "580274",
+              "title": "",
+              "text_preview": "Robert Kelly Thomas (born February 14, 1972) is an American singer, songwriter, record producer and multi-instrumentalist, best known as the lead singer of Alternative band Matchbox 20. Thomas also records and performs as a solo artist with \"Lonely No More\" released in 2005 becoming his biggest solo chart success. Thomas earned three Grammy Awards for co-writing and singing on the three-time Grammy Award Winning 1999 Summer smash hit, \"Smooth\" by Santana, off the fifteen-time Platinum album \"...",
+              "text_tokens": 81,
+              "query_token_overlap": 0.2
+            }
+          ]
+        },
+        {
+          "query_id": "5abdf8c45542993f32c2a072",
+          "query": "The Death of Cook depicts the death of James Cook at a bay on what coast?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "838269",
+              "title": "",
+              "text_preview": "Death of Cook is the name of several paintings depicting the 1779 death of British and discoverer of the Hawaiian Islands, Captain James Cook at Kealakekua Bay.",
+              "text_tokens": 27,
+              "query_token_overlap": 0.583
+            },
+            {
+              "doc_id": "1214610",
+              "title": "",
+              "text_preview": "Kealakekua Bay is located on the Kona coast of the island of Hawaiʻ i about 12 mi south of Kailua-Kona.",
+              "text_tokens": 21,
+              "query_token_overlap": 0.417
+            }
+          ]
+        },
+        {
+          "query_id": "5adbd70c55429947ff173843",
+          "query": "What is the title of the memoir written by the honoree of the Black and White Ball?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "7727406",
+              "title": "",
+              "text_preview": "The Black and White Ball was a masquerade ball held on November 28, 1966 at the Plaza Hotel in New York City. Hosted by author Truman Capote, the ball was in honor of \"The Washington Post\" publisher Katharine Graham.",
+              "text_tokens": 39,
+              "query_token_overlap": 0.538
+            },
+            {
+              "doc_id": "408127",
+              "title": "",
+              "text_preview": "Katharine Meyer Graham (June 16, 1917 – July 17, 2001) was an American publisher. She led her family's newspaper, \"The Washington Post\", for more than two decades, overseeing its most famous period, the Watergate coverage that eventually led to the resignation of President Richard Nixon. Her memoir, \"Personal History\", won the Pulitzer Prize in 1998.",
+              "text_tokens": 55,
+              "query_token_overlap": 0.231
+            }
+          ]
+        },
+        {
+          "query_id": "5ae0ae4555429945ae959419",
+          "query": "Jal Pari, which translated in another language refers to which legendary creature which are sometimes associated with perilous events such as floods, storm,s shipwrecks, and drownings?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "6673260",
+              "title": "",
+              "text_preview": "Jal Pari (Urdu for \"Mermaid\") is Atif Aslam's first solo album after he left the Pakistani rock group, Jal, released on 17 July 2004. Two of his songs from the album were used by Bollywood film directors. Three songs have also been selected for the Hollywood film \"Man Push Cart\".",
+              "text_tokens": 51,
+              "query_token_overlap": 0.12
+            },
+            {
+              "doc_id": "76592",
+              "title": "",
+              "text_preview": "A mermaid is a legendary aquatic creature with the head and upper body of a female human and the tail of a fish. Mermaids appear in the folklore of many cultures worldwide, including the Near East, Europe, Africa and Asia. The first stories appeared in ancient Assyria, in which the goddess Atargatis transformed herself into a mermaid out of shame for accidentally killing her human lover. Mermaids are sometimes associated with perilous events such as floods, storms, shipwrecks and drownings. I...",
+              "text_tokens": 104,
+              "query_token_overlap": 0.64
+            }
+          ]
+        },
+        {
+          "query_id": "5a89f68f5542992e4fca84b6",
+          "query": "What kind of person of authority does Governor of Sheerness and Stapleton Cotton, 1st Viscount Combermere have in common?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "29728545",
+              "title": "",
+              "text_preview": "The Governor of Sheerness Fort and the Isle of Sheppey was a military officer who commanded the fortifications at Sheerness, on the Isle of Sheppey, part of the defences of the Medway estuary. The area had been fortified since the time of Henry VIII, but the Sheerness fortifications were destroyed in 1667 when it was captured during the Dutch Raid on the Medway. It was subsequently re-fortified as Sheerness became the site of a major Royal Navy dockyard, in operation until 1960. The post of G...",
+              "text_tokens": 105,
+              "query_token_overlap": 0.353
+            },
+            {
+              "doc_id": "2399083",
+              "title": "",
+              "text_preview": "Field Marshal Stapleton Cotton, 1st Viscount Combermere {'1': \", '2': \", '3': \", '4': \"} (14 November 1773 – 21 February 1865), was a British Army officer, diplomat and politician. As a junior officer he took part in the Flanders Campaign, in the Fourth Anglo-Mysore War and in the suppression of Robert Emmet's insurrection in 1803. He commanded a cavalry brigade in Sir Arthur Wellesley's Army before being given overall command of the cavalry in the latter stages of the Peninsular War. He went...",
+              "text_tokens": 110,
+              "query_token_overlap": 0.471
+            }
+          ]
+        },
+        {
+          "query_id": "5aba67c255429955dce3ee10",
+          "query": "Both The Badgeman and +44 were bands concieved in which country?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "33733292",
+              "title": "",
+              "text_preview": "The Badgeman were a four-piece indie rock band from Salisbury, Wiltshire formed in 1988, although music journalist Pete Frame claims in his book \"Rockin Around Britain\" that the band hailed from Melksham. The band has been variously categorised as Alternative rock, shoegazing, indie rock, psychedelic rock, and post punk. The band released two albums on Paperhouse Records, and appeared on two compilation releases, along with artists such as Nirvana, Lee Ranaldo of Sonic Youth, Echo and The Bun...",
+              "text_tokens": 83,
+              "query_token_overlap": 0.455
+            },
+            {
+              "doc_id": "3785255",
+              "title": "",
+              "text_preview": "+44 (read as Plus Forty-four) was an American rock supergroup formed in Los Angeles, California in 2005. The group consisted of vocalist and bassist Mark Hoppus and drummer Travis Barker of Blink-182, lead guitarist Shane Gallagher of The Nervous Return and rhythm guitarist Craig Fairbaugh of Mercy Killers. Hoppus and Barker created +44 shortly after the initial 2005 breakup of Blink-182, before they were later reformed, and the band's name refers to the international dialing code of the Unit...",
+              "text_tokens": 116,
+              "query_token_overlap": 0.545
+            }
+          ]
+        },
+        {
+          "query_id": "5ab4f7fc5542991779162d43",
+          "query": "Kete Krachi is a town in what region?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "4087014",
+              "title": "",
+              "text_preview": "Kete Krachi is a town in the Krachi West District of the Volta Region of Ghana. Kete Krachi is the capital of the Krachi West District. It is in the West of the Volta region, and is adjacent to Lake Volta. Kete Krachi is connected by a ferry to the town of Kwadjokrom, and by road to Bimbila and Dambai. The town is also known for the Kete Krachi Secondary Technology. The school is a second cycle institution. Kete Krachi is the seventy-second most populous settlement in Ghana, in terms of popul...",
+              "text_tokens": 100,
+              "query_token_overlap": 0.875
+            },
+            {
+              "doc_id": "4143197",
+              "title": "",
+              "text_preview": "The Krachi West District is one of the twenty-five (25) districts in the Volta Region. Krachi West district capital and administrative centre is Kete Krachi.",
+              "text_tokens": 26,
+              "query_token_overlap": 0.625
+            }
+          ]
+        },
+        {
+          "query_id": "5ac3c08a5542995ef918c217",
+          "query": "who features in the series  which McClure hosts",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "64906",
+              "title": "",
+              "text_preview": "Troy McClure is a fictional character from the American animated sitcom \"The Simpsons\". He was voiced by Phil Hartman and first appeared in the second season episode \"Homer vs. Lisa and the 8th Commandment\". McClure is usually shown doing low-level work, such as hosting infomercials and educational films. He appears as the main character in \"A Fish Called Selma\", in which he marries Selma Bouvier to aid his failing career and quash rumors about his personal life. McClure also 'hosts' \"The Sim...",
+              "text_tokens": 92,
+              "query_token_overlap": 0.625
+            },
+            {
+              "doc_id": "2080959",
+              "title": "",
+              "text_preview": "\"The Simpsons Spin-Off Showcase\" is the twenty-fourth episode of the eighth season of \"The Simpsons\". It originally aired on the Fox network in the United States on May 11, 1997. The episode centers on fictional pilot episodes of non-existent television series derived from \"The Simpsons\", and is a parody of the tendency of networks to spin off characters from a hit series. As such it includes references to many different TV series. The first fictional spin-off is \"Chief Wiggum P.I.\", a cop-dr...",
+              "text_tokens": 146,
+              "query_token_overlap": 0.5
+            }
+          ]
+        },
+        {
+          "query_id": "5ac4e593554299076e296e37",
+          "query": "OU812 was the second album to feature a vocalist that also played what instrument in \"Finish What Ya Started\"?",
+          "support_doc_count": 2,
+          "support_docs": [
+            {
+              "doc_id": "9184891",
+              "title": "",
+              "text_preview": "\"Finish What Ya Started\" is a song by Van Halen taken from their 1988 album \"OU812\". Despite the album being seemingly complete, Eddie Van Halen came up with the riff at 2 in the morning and went down to his then-neighbor Sammy Hagar to show it. Hagar let Eddie in, and the two played guitars in his balcony until they had a completed song. Once Eddie left, Hagar decided to write the lyrics despite being late at night. The theme wound up being unfulfilled sex, summed up by Hagar as \"blue balls....",
+              "text_tokens": 139,
+              "query_token_overlap": 0.611
+            },
+            {
+              "doc_id": "1070315",
+              "title": "",
+              "text_preview": "OU812 (pronounced \"Oh You Ate One Too\") is the eighth studio album by American hard rock band Van Halen, released in 1988, and the second to feature vocalist Sammy Hagar. Van Halen started work on the album in September 1987 and completed it in April 1988, just one month before its release.",
+              "text_tokens": 52,
+              "query_token_overlap": 0.5
+            }
+          ]
+        }
+      ],
+      "support_overlap_query_token_ratio": {
+        "min": 0.12,
+        "p50": 0.5,
+        "p90": 0.64,
+        "p95": 0.692,
+        "p99": 0.875,
+        "max": 0.875,
+        "avg": 0.487
+      },
+      "elapsed_sec": 0.313
+    },
+    {
+      "dataset_id": "beir/hotpotqa",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": false,
+        "docs_count": 5233329,
+        "queries_count": 97852,
+        "qrels_count": null
+      },
+      "elapsed_sec": 0.001
+    },
+    {
+      "dataset_id": "beir/hotpotqa/train",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 85000,
+        "qrels_count": 170000
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "dataset_id": "beir/hotpotqa/dev",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 5447,
+        "qrels_count": 10894
+      },
+      "elapsed_sec": 0.0
+    },
+    {
+      "dataset_id": "beir/hotpotqa/test",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 7405,
+        "qrels_count": 14810
+      },
+      "elapsed_sec": 0.0
+    }
+  ],
+  "references": [
+    {
+      "name": "HotpotQA original paper",
+      "url": "https://aclanthology.org/D18-1259/",
+      "note": "Defines bridge/comparison multi-hop QA, supporting facts, and explainable QA setting."
+    },
+    {
+      "name": "HotpotQA official dataset/wiki preprocessing",
+      "url": "https://hotpotqa.github.io/wiki-readme.html",
+      "note": "Describes processed Wikipedia pages with title, url, sentence text, hyperlinks, and char offsets."
+    },
+    {
+      "name": "BEIR benchmark paper",
+      "url": "https://arxiv.org/abs/2104.08663",
+      "note": "Standardizes heterogeneous retrieval datasets including HotpotQA into corpus/query/qrels evaluation."
+    },
+    {
+      "name": "BEIR repository data format",
+      "url": "https://github.com/beir-cellar/beir",
+      "note": "Uses corpus.jsonl, queries.jsonl, and qrels TSV conventions for retrieval benchmarks."
+    },
+    {
+      "name": "Multi-hop Dense Retrieval",
+      "url": "https://arxiv.org/abs/2009.12756",
+      "note": "Retrieves evidence chains with hop-conditioned dense retrieval for open-domain multi-hop QA."
+    },
+    {
+      "name": "DrKIT",
+      "url": "https://arxiv.org/abs/2002.10640",
+      "note": "Shows an entity-centric differentiable retrieval/reasoning direction relevant to bridge questions."
+    }
+  ],
+  "pipeline_research": [
+    {
+      "name": "HotpotQA",
+      "url": "https://aclanthology.org/D18-1259/",
+      "pipeline": "Dataset được thiết kế cho bridge/comparison multi-hop QA và có supporting facts ở mức sentence.",
+      "takeaway": "Đừng chỉ show top-1 doc; phải inspect đủ evidence chain và đo đủ supporting documents."
+    },
+    {
+      "name": "BEIR format",
+      "url": "https://github.com/beir-cellar/beir",
+      "pipeline": "Chuẩn hóa retrieval thành corpus, queries, qrels để benchmark nDCG/Recall/MRR/Precision.",
+      "takeaway": "Giữ pipeline tách loader/index/retriever/evaluator; qrels là contract đánh giá."
+    },
+    {
+      "name": "GoldEn Retriever",
+      "url": "https://arxiv.org/abs/1910.07000",
+      "pipeline": "Lặp giữa đọc context đã retrieve và sinh query mới để tìm missing entity/document.",
+      "takeaway": "Iterative query expansion nên dựa trên evidence hop 1, không nối bừa toàn bộ top-k."
+    },
+    {
+      "name": "Multi-hop Dense Retrieval",
+      "url": "https://arxiv.org/abs/2009.12756",
+      "pipeline": "Retrieve hop 1 rồi condition hop 2 bằng evidence đã tìm được để học evidence chain.",
+      "takeaway": "Dense baseline nâng cấp nên đánh giá theo chain/full_support_recall@k, không chỉ doc recall rời rạc."
+    },
+    {
+      "name": "Baleen",
+      "url": "https://arxiv.org/abs/2101.00436",
+      "pipeline": "Condensed retrieval: sau mỗi hop tóm gọn passages đã retrieve thành context nhỏ để truy hồi tiếp.",
+      "takeaway": "Khi lên full corpus, phải giới hạn state giữa các hop để search space không phình theo cấp số nhân."
+    },
+    {
+      "name": "IRCoT",
+      "url": "https://arxiv.org/abs/2212.10509",
+      "pipeline": "Interleave retrieval với từng reasoning step; step mới lại dẫn retrieval mới.",
+      "takeaway": "Sau baseline, có thể dùng reasoning-step/query-step làm debug view cho câu hỏi bridge khó."
+    },
+    {
+      "name": "DrKIT",
+      "url": "https://arxiv.org/abs/2002.10640",
+      "pipeline": "Entity-centric retrieval/reasoning bằng virtual KB từ entity mentions và linking.",
+      "takeaway": "Bridge questions nên có entity-aware expansion hoặc entity logging để biết hop nào bị đứt."
+    }
+  ]
+}

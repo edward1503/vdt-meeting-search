@@ -29,7 +29,13 @@ data/*.zip
 *.csv
 *.json
 !evaluation/*.json
+!evaluation/results/*.json
 !docs/*.json
+
+# Local generated indexes/cache
+data/indexes/
+data/cache/
+artifacts/
 
 # Models
 models/
@@ -53,3 +59,6 @@ logs/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Local brainstorming companion
+.superpowers/

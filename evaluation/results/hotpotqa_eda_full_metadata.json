@@ -1,0 +1,52 @@
+{
+  "reports": [
+    {
+      "dataset_id": "beir/hotpotqa",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": false,
+        "docs_count": 5233329,
+        "queries_count": 97852,
+        "qrels_count": null
+      },
+      "elapsed_sec": 0.003
+    },
+    {
+      "dataset_id": "beir/hotpotqa/train",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 85000,
+        "qrels_count": 170000
+      },
+      "elapsed_sec": 0.001
+    },
+    {
+      "dataset_id": "beir/hotpotqa/dev",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 5447,
+        "qrels_count": 10894
+      },
+      "elapsed_sec": 0.001
+    },
+    {
+      "dataset_id": "beir/hotpotqa/test",
+      "metadata": {
+        "has_docs": true,
+        "has_queries": true,
+        "has_qrels": true,
+        "docs_count": 5233329,
+        "queries_count": 7405,
+        "qrels_count": 14810
+      },
+      "elapsed_sec": 0.001
+    }
+  ]
+}

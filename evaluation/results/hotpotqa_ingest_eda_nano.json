@@ -1,0 +1,265 @@
+{
+  "dataset_id": "nano-beir/hotpotqa",
+  "metadata": {
+    "has_docs": true,
+    "has_queries": true,
+    "has_qrels": true,
+    "docs_count": 5090,
+    "queries_count": 50,
+    "qrels_count": 100
+  },
+  "splits": [
+    {
+      "dataset_id": "beir/hotpotqa/train",
+      "has_queries": true,
+      "has_qrels": true,
+      "queries_count": 85000,
+      "qrels_count": 170000
+    },
+    {
+      "dataset_id": "beir/hotpotqa/dev",
+      "has_queries": true,
+      "has_qrels": true,
+      "queries_count": 5447,
+      "qrels_count": 10894
+    },
+    {
+      "dataset_id": "beir/hotpotqa/test",
+      "has_queries": true,
+      "has_qrels": true,
+      "queries_count": 7405,
+      "qrels_count": 14810
+    },
+    {
+      "dataset_id": "nano-beir/hotpotqa",
+      "has_queries": true,
+      "has_qrels": true,
+      "queries_count": 50,
+      "qrels_count": 100
+    }
+  ],
+  "documents": {
+    "iterated": 5090,
+    "total_docs": 5090,
+    "missing": {
+      "title": 5090,
+      "text": 0,
+      "url": 5090,
+      "content": 0
+    },
+    "duplicates": {
+      "doc_id_duplicate_count": 0,
+      "content_hash_duplicate_count": 0
+    },
+    "title_token_lengths": {
+      "min": 0,
+      "p50": 0,
+      "p90": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0,
+      "avg": 0
+    },
+    "text_token_lengths": {
+      "min": 4,
+      "p50": 50,
+      "p90": 113,
+      "p95": 136,
+      "p99": 194,
+      "max": 352,
+      "avg": 58.399
+    },
+    "content_token_lengths": {
+      "min": 4,
+      "p50": 50,
+      "p90": 113,
+      "p95": 136,
+      "p99": 194,
+      "max": 352,
+      "avg": 58.399
+    },
+    "content_char_lengths": {
+      "min": 24,
+      "p50": 299,
+      "p90": 675,
+      "p95": 814,
+      "p99": 1157,
+      "max": 2079,
+      "avg": 349.631
+    },
+    "source_bytes": {
+      "min": 120,
+      "p50": 677,
+      "p90": 1435,
+      "p95": 1711,
+      "p99": 2411,
+      "max": 4231,
+      "avg": 778.956
+    },
+    "samples": [
+      {
+        "doc_id": "974",
+        "title": "",
+        "url": "",
+        "content_tokens": 91,
+        "content_chars": 560,
+        "source_bytes": 1203,
+        "content_preview": "Augusta Ada King-Noel, Countess of Lovelace (\"née\" Byron; 10 December 1815 – 27 November 1852) was an English mathematician and writer, chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine. She was the first to recognise that the machine had applications beyond pure calculation, and created th..."
+      },
+      {
+        "doc_id": "4009",
+        "title": "",
+        "url": "",
+        "content_tokens": 53,
+        "content_chars": 330,
+        "source_bytes": 739,
+        "content_preview": "Bigfoot (also known as Sasquatch) is a cryptid which supposedly is a simian-like creature of American folklore that is said to inhabit forests, especially in the Pacific Northwest. Bigfoot is usually described as a large, hairy, bipedal humanoid. The term \"sasquatch\" is an Anglicized derivative of the Halkomelem word \"sásq'ets\"."
+      },
+      {
+        "doc_id": "4955",
+        "title": "",
+        "url": "",
+        "content_tokens": 69,
+        "content_chars": 414,
+        "source_bytes": 953,
+        "content_preview": "A bokken (木剣 , \"bok(u)\", \"wood\", and \"ken\", \"sword\") (or a \"bokutō\" 木刀 , as they are instead called in Japan) is a Japanese wooden sword used for training. It is usually the size and shape of a \"katana\", but is sometimes shaped like other swords, such as the \"wakizashi\" and \"tantō\". Some ornamental bokken are decorated with mother-of-pearl work and elabor..."
+      },
+      {
+        "doc_id": "5828",
+        "title": "",
+        "url": "",
+        "content_tokens": 64,
+        "content_chars": 429,
+        "source_bytes": 931,
+        "content_preview": "Cryptozoology is a pseudoscience that aims to prove the existence of entities from the folklore record, such as Bigfoot or chupacabras, as well as animals otherwise considered extinct, such as dinosaurs. Cryptozoologists refer to these entities as \"cryptids\". Because it does not follow the scientific method, cryptozoology is considered a pseudoscience by ..."
+      },
+      {
+        "doc_id": "6226",
+        "title": "",
+        "url": "",
+        "content_tokens": 52,
+        "content_chars": 340,
+        "source_bytes": 753,
+        "content_preview": "Claudio Giovanni Antonio Monteverdi (] ; 15 May 1567 (baptized) – 29 November 1643) was an Italian composer, string player and choirmaster. A composer of both secular and sacred music, and a pioneer in the development of opera, he is considered a crucial transitional figure between the Renaissance and the Baroque periods of music history."
+      },
+      {
+        "doc_id": "6542",
+        "title": "",
+        "url": "",
+        "content_tokens": 142,
+        "content_chars": 807,
+        "source_bytes": 1709,
+        "content_preview": "Czesław Miłosz ( ; 30 June 1911 – 14 August 2004) was a Polish poet, prose writer, translator and diplomat. His World War II-era sequence \"The World\" is a collection of twenty \"naïve\" poems. Following the war, he served as Polish cultural attaché in Paris and Washington, D.C., then in 1951 defected to the West. His nonfiction book \"The Captive Mind\" (1953..."
+      },
+      {
+        "doc_id": "7376",
+        "title": "",
+        "url": "",
+        "content_tokens": 167,
+        "content_chars": 1060,
+        "source_bytes": 2197,
+        "content_preview": "The cosmic microwave background (CMB) is electromagnetic radiation left over from an early stage of the universe in Big Bang cosmology. In older literature, the CMB is also variously known as cosmic microwave background radiation (CMBR) or \"relic radiation\". The CMB is a faint cosmic background radiation filling all space that is an important source of da..."
+      },
+      {
+        "doc_id": "7891",
+        "title": "",
+        "url": "",
+        "content_tokens": 59,
+        "content_chars": 386,
+        "source_bytes": 857,
+        "content_preview": "David Keith Lynch (born January 20, 1946) is an American director, screenwriter, producer, painter, musician, actor, and photographer. He has been described by \"The Guardian\" as \"the most important director of this era\". AllMovie called him \"the Renaissance man of modern American filmmaking\", while the success of his films has led to him being labelled \"t..."
+      }
+    ],
+    "longest_docs": [
+      {
+        "doc_id": "26144008",
+        "title": "",
+        "url": "",
+        "content_tokens": 352,
+        "content_chars": 2079,
+        "source_bytes": 4231,
+        "content_preview": "Marine art was especially popular in Britain during the Romantic Era, and taken up readily by British artists in part because of England's geographical form (an island). This article deals with marine art as a specialized genre practised by artists who did little or nothing else, and does not cover the marine works of the leading painters of the period, s..."
+      },
+      {
+        "doc_id": "21295595",
+        "title": "",
+        "url": "",
+        "content_tokens": 335,
+        "content_chars": 1968,
+        "source_bytes": 4025,
+        "content_preview": "Howard Newton \"Sonny\" Keys was an American football offensive lineman in the National Football League from 1960 to 1965 with the Philadelphia Eagles. He was born in Orlando, Oklahoma, on January 24, 1935. Sonny was a star athlete for the Pioneers at Stillwater High School in Stillwater, Oklahoma where he played football, basketball, baseball and track. He..."
+      },
+      {
+        "doc_id": "17473409",
+        "title": "",
+        "url": "",
+        "content_tokens": 304,
+        "content_chars": 1743,
+        "source_bytes": 3581,
+        "content_preview": "Polybus (Greek: Πόλυβος ) is a figure in Greek mythology. He was the king of Corinth and husband of either Merope or Periboea. He raised Oedipus as his adopted son, who had been abandoned by his parents Laius and Jocasta of Thebes in Greece. Polybus was the true father of Alcinoe. In virtually all accounts of the mythology, when Oedipus reached adolescenc..."
+      },
+      {
+        "doc_id": "43941464",
+        "title": "",
+        "url": "",
+        "content_tokens": 300,
+        "content_chars": 1800,
+        "source_bytes": 3677,
+        "content_preview": "William Gagan (born in 1981) is an American photojournalist from San Francisco, CA. He attended Redwood High School (Larkspur, California) and graduated in 1999. He then went on to pursue a bachelor's degree in Communications at Dominican University of California which he received in 2003. In September 2011 he joined the Occupy Wall Street movement as a l..."
+      },
+      {
+        "doc_id": "9787130",
+        "title": "",
+        "url": "",
+        "content_tokens": 294,
+        "content_chars": 1704,
+        "source_bytes": 3500,
+        "content_preview": "Pasola is a mounted spear-fighting competition from western Sumba, Indonesia. It is played by throwing wooden spears at the opponent while riding a horse to celebrate the rice-planting season. The word \"pasola\" means spear in the local language and derives from the Sanskrit \"sula\". According to legend, pasola originated with a woman from the village of Wa..."
+      },
+      {
+        "doc_id": "50671747",
+        "title": "",
+        "url": "",
+        "content_tokens": 286,
+        "content_chars": 1745,
+        "source_bytes": 3587,
+        "content_preview": "The Hangmen were an American garage rock band from Rockville, Maryland who were active in the 1960s. In an effort to distinguish themselves from other American groups and tie-in with the popular British Invasion, they lured Scottish vocalist Dave Ottley to join the group. Eventually they became the most popular band in the Washington, DC area, having a hu..."
+      },
+      {
+        "doc_id": "9429001",
+        "title": "",
+        "url": "",
+        "content_tokens": 278,
+        "content_chars": 1541,
+        "source_bytes": 3170,
+        "content_preview": "The Akron Zips men's basketball team represents the University of Akron in Akron, Ohio. The team currently competes in the Mid-American Conference East division. The team first played in the NCAA Tournament in 1986 when Bob Huggins was their coach. The Zips are currently coached by John Groce, who is in his first year with the school. The Zips won their f..."
+      },
+      {
+        "doc_id": "3410119",
+        "title": "",
+        "url": "",
+        "content_tokens": 274,
+        "content_chars": 1580,
+        "source_bytes": 3272,
+        "content_preview": "The discography of the Pet Shop Boys, an English electronic/pop music duo, comprises 13 studio albums, four compilation albums, two live albums, four remix albums, one extended play and 55 singles. The duo's debut single, \"West End Girls\", was first released in 1984 but failed to chart in most regions. However, the song was entirely re-recorded in late 19..."
+      }
+    ],
+    "ingest_plan": {
+      "total_docs": 5090,
+      "avg_source_bytes": 778.956,
+      "estimated_source_gb": 0.004,
+      "embedding_float32_gb": 0.007,
+      "embedding_float16_gb": 0.004,
+      "estimated_index_gb": 0.015,
+      "staging_docs_per_file": 50000,
+      "staging_file_count": 1,
+      "bulk_target_mb": 10,
+      "estimated_bulk_doc_bytes": 4874.956,
+      "recommended_bulk_docs": 2150,
+      "shard_target_gb": 30,
+      "recommended_primary_shards": 1
+    },
+    "docs_elapsed_sec": 0.32
+  },
+  "elapsed_sec": 0.326
+}
