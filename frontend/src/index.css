@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Hanken Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-label: "Geist", sans-serif;
+
+  --color-primary: #bf0027;
+  --color-primary-container: #ee0033;
+  --color-surface: #f9f9ff;
+  --color-surface-container: #e7eefe;
+  --color-surface-container-low: #f0f3ff;
+  --color-surface-container-high: #e2e8f8;
+  --color-on-surface: #151c27;
+  --color-on-surface-variant: #5e3f3e;
+  --color-outline: #936e6c;
+  --color-outline-variant: #e8bcba;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-outline-variant/50 rounded-full;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-outline-variant;
+}
+
+.evidence-highlight {
+  @apply bg-primary/10 border-b-2 border-primary px-0.5;
+}

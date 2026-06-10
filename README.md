@@ -35,17 +35,44 @@ python -m src.evaluation.benchmark_es --dataset nano-beir/hotpotqa --index hotpo
 
 The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency percentiles, and QPS.
 
-## API Demo
+## Docker Development Stack
+
+Run the local embedding service plus Elasticsearch, Redis, FastAPI, and the React/Vite dashboard together:
 
 ```bash
-uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+.\scripts\docker-dev.ps1
 ```
 
-Open the static frontend:
+Or use the helper scripts:
 
-```text
-frontend/index.html
+```powershell
+.\scripts\docker-dev.ps1
 ```
+
+```bash
+sh scripts/docker-dev.sh
+```
+
+Open:
+
+- Frontend dashboard: `http://localhost:3001`
+- FastAPI docs: `http://localhost:8001/docs`
+- Elasticsearch: `http://localhost:9200`
+- Redis: internal Compose service `redis:6379`
+
+The frontend container uses Vite hot reload with `./frontend:/app` and a Docker named volume for `/app/node_modules`. The API container uses Uvicorn reload with bind-mounted Python source. Redis caches repeated `/search` responses using `REDIS_URL` and `SEARCH_CACHE_TTL_SECONDS`. Dense and hybrid search call the local embedding service at `http://host.docker.internal:8010/embed`, so PyTorch and SentenceTransformers stay outside the Docker API image.
+
+## API Demo
+
+Without Docker, run the API and frontend separately:
+
+```bash
+python scripts/embedding_server.py --host 0.0.0.0 --port 8010`r`nuvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000`r`ncd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:3001`.
 
 ## Docs
 

@@ -89,3 +89,42 @@ def test_query_builders_and_rrf_are_stable():
 
     fused = fuse_rrf([[{'doc_id': 'a'}, {'doc_id': 'b'}], [{'doc_id': 'b'}, {'doc_id': 'c'}]], top_k=3)
     assert [hit['doc_id'] for hit in fused] == ['b', 'a', 'c']
+
+
+def test_dense_search_uses_embedding_service_when_configured(monkeypatch):
+    from io import BytesIO
+    from src.retrieval import elasticsearch_retriever as module
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    requests = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return BytesIO(b'{"embedding":[0.1,0.2,0.3]}')
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(request, timeout):
+        requests.append({"url": request.full_url, "body": request.data.decode("utf-8"), "timeout": timeout})
+        return FakeResponse()
+
+    monkeypatch.setattr(module.request, "urlopen", fake_urlopen)
+
+    class FakeES:
+        def search(self, index, body):
+            assert index == "idx"
+            assert body["knn"]["query_vector"] == [0.1, 0.2, 0.3]
+            return {"hits": {"hits": [{"_id": "d1", "_score": 1.0, "_source": {"doc_id": "d1", "title": "T"}}]}}
+
+    retriever = ElasticsearchRetriever(
+        es=FakeES(),
+        index="idx",
+        model_name="model",
+        embedding_service_url="http://embedding.local/embed",
+    )
+
+    hits = retriever.search("hello", "dense", top_k=1)
+
+    assert hits[0]["doc_id"] == "d1"
+    assert requests == [{"url": "http://embedding.local/embed", "body": '{"text":"hello"}', "timeout": 30}]

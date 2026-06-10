@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from typing import Any
+from urllib import request
 
 
 def build_index_body(dims: int, shards: int = 1) -> dict[str, Any]:
@@ -69,12 +71,23 @@ def fuse_rrf(rankings: list[list[dict[str, Any]]], top_k: int, rrf_k: int = 60) 
 
 
 class ElasticsearchRetriever:
-    def __init__(self, es: Any, index: str, model_name: str, num_candidates: int = 1000, model: Any | None = None) -> None:
+    def __init__(
+        self,
+        es: Any,
+        index: str,
+        model_name: str,
+        num_candidates: int = 1000,
+        model: Any | None = None,
+        embedding_service_url: str = "",
+        embedding_timeout_seconds: int = 30,
+    ) -> None:
         self.es = es
         self.index = index
         self.model_name = model_name
         self.model = model
         self.num_candidates = num_candidates
+        self.embedding_service_url = embedding_service_url.rstrip("/")
+        self.embedding_timeout_seconds = embedding_timeout_seconds
 
     def search(self, query: str, method: str, top_k: int, candidate_k: int = 100, rrf_k: int = 60) -> list[dict[str, Any]]:
         if method == "bm25":
@@ -127,10 +140,24 @@ class ElasticsearchRetriever:
         return " ".join(part for part in [query, title, context] if part)
 
     def _search_dense(self, query: str, top_k: int, num_candidates: int) -> list[dict[str, Any]]:
-        vector = _vector_to_list(
-            self._model().encode([query], normalize_embeddings=True, convert_to_numpy=True)[0]
+        return self._search_body(build_knn_query(self._embed_query(query), top_k, num_candidates), "dense")
+
+    def _embed_query(self, query: str) -> list[float]:
+        if self.embedding_service_url:
+            return self._embed_query_remote(query)
+        return _vector_to_list(self._model().encode([query], normalize_embeddings=True, convert_to_numpy=True)[0])
+
+    def _embed_query_remote(self, query: str) -> list[float]:
+        payload = json.dumps({"text": query}, separators=(",", ":")).encode("utf-8")
+        req = request.Request(
+            self.embedding_service_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        return self._search_body(build_knn_query(vector, top_k, num_candidates), "dense")
+        with request.urlopen(req, timeout=self.embedding_timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return [float(value) for value in body["embedding"]]
 
     def _search_body(self, body: dict[str, Any], source: str) -> list[dict[str, Any]]:
         response = self.es.search(index=self.index, body=body)
