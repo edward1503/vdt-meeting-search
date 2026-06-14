@@ -4,7 +4,7 @@
 
 Sprint 3 builds the full-scale retrieval path for HotpotQA using Elasticsearch for BM25/document storage, TurboVec for dense retrieval, and application-layer RRF for hybrid fusion.
 
-Current implementation status: code paths and focused tests are implemented. Full 5,233,329-document staging is complete. Elasticsearch ingest, embedding generation, TurboVec full-index build, and 200-query benchmark remain pending platform jobs.
+Current implementation status: code paths and focused tests are implemented. Full 5,233,329-document staging is complete. Elasticsearch BM25 ingest and 200-query BM25 benchmark are complete. Embedding generation, TurboVec full-index build, and dense/hybrid benchmark remain pending platform jobs.
 
 ## 2. Hardware
 
@@ -63,7 +63,7 @@ dcg@10`, and `full_support_recall@10`.
 
 ## 8. Latency and QPS
 
-Pending full benchmark. The API now includes `latency_breakdown_ms` for TurboVec methods with embed, BM25, TurboVec, fusion, and hydration timings when available.
+BM25 200-query latency: p50=69.0372ms, p95=161.1425ms, p99=251.0045ms, qps=12.8747. The API includes `latency_breakdown_ms` for TurboVec methods with embed, BM25, TurboVec, fusion, and hydration timings when available.
 
 ## 9. Tuning Results
 
@@ -105,5 +105,6 @@ TurboVec retriever loading is lazy and only happens when a `tv_*` method is requ
 python -m pytest -q
 55 passed, 3 warnings
 ```
+
 
 
