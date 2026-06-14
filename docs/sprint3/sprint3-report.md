@@ -4,7 +4,7 @@
 
 Sprint 3 builds the full-scale retrieval path for HotpotQA using Elasticsearch for BM25/document storage, TurboVec for dense retrieval, and application-layer RRF for hybrid fusion.
 
-Current implementation status: code paths and focused tests are implemented. Full 5,233,329-document staging, Elasticsearch ingest, embedding generation, TurboVec full-index build, and 200-query benchmark remain pending platform jobs.
+Current implementation status: code paths and focused tests are implemented. Full 5,233,329-document staging is complete. Elasticsearch ingest, embedding generation, TurboVec full-index build, and 200-query benchmark remain pending platform jobs.
 
 ## 2. Hardware
 
@@ -14,9 +14,7 @@ Pending measurement for full run. Target local environment is Windows/Python 3.1
 
 Target corpus: HotpotQA full corpus with 5,233,329 documents.
 
-Pending artifact:
-
-- `artifacts/hotpotqa_full/staging/manifest.json`
+Completed artifact:`n`n- `artifacts/hotpotqa_full/staging/manifest.json`: docs_written=5,233,329, files_written=105, numeric_id_start=0, numeric_id_end=5,233,328
 
 ## 4. Architecture
 
@@ -107,4 +105,5 @@ TurboVec retriever loading is lazy and only happens when a `tv_*` method is requ
 python -m pytest -q
 55 passed, 3 warnings
 ```
+
 
