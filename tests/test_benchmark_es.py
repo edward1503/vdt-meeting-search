@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from types import SimpleNamespace
 
@@ -239,3 +239,47 @@ def test_run_benchmark_uses_qrels_file_with_query_file(monkeypatch, tmp_path):
     assert result['config']['queries'] == 1
     assert result['config']['qrels_file'] == str(qrels_file)
     assert result['results'][0]['metrics']['recall@10'] == 1.0
+
+
+def test_method_mapping_accepts_turbovec_methods():
+    assert benchmark_es.classify_method("es_bm25") == "es"
+    assert benchmark_es.classify_method("tv_dense") == "turbovec"
+    assert benchmark_es.classify_method("tv_hybrid") == "turbovec"
+
+
+def test_run_benchmark_with_query_and_qrels_files_does_not_load_ir_dataset(monkeypatch, tmp_path):
+    query_file = tmp_path / "queries.tsv"
+    qrels_file = tmp_path / "qrels.tsv"
+    query_file.write_text("variant_query_id\tsource_query_id\tquery\nq1\tq1\tcustom query\n", encoding="utf-8")
+    qrels_file.write_text("query_id\tdoc_id\trelevance\nq1\td1\t1\n", encoding="utf-8")
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: (_ for _ in ()).throw(AssertionError("should not load ir_datasets")))
+
+    class FakeRetriever:
+        def search(self, query, method, top_k, **kwargs):
+            assert method == "tv_dense"
+            return [{"doc_id": "d1", "score": 1.0}]
+
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["tv_dense"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=20,
+        rrf_k=7,
+        first_hop_k=5,
+        second_hop_k=10,
+        context_chars=256,
+        run_dir=tmp_path,
+        query_file=query_file,
+        qrels_file=qrels_file,
+    )
+
+    assert result["config"]["queries"] == 1
+    assert result["results"][0]["metrics"]["recall@10"] == 1.0

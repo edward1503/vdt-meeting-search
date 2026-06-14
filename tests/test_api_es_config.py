@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from src.core.config import Settings
 from types import SimpleNamespace
@@ -66,3 +66,15 @@ def test_load_benchmark_result_reads_json(tmp_path):
         "config": {"queries": 1},
         "results": [{"method": "es_bm25"}],
     }
+
+
+def test_api_exposes_turbovec_methods_and_settings():
+    from src.api import main
+
+    settings = Settings()
+
+    assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(main.METHODS)
+    assert settings.turbovec_bit_width == 4
+    assert settings.turbovec_dim == 384
+    assert settings.hybrid_bm25_k == 100
+    assert settings.hybrid_dense_k == 100

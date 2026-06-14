@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 from dataclasses import dataclass
@@ -26,5 +26,12 @@ class Settings:
     redis_url: str = os.getenv("REDIS_URL", "")
     search_cache_ttl_seconds: int = int(os.getenv("SEARCH_CACHE_TTL_SECONDS", "300"))
     warmup_embedding_model: bool = os.getenv("WARMUP_EMBEDDING_MODEL", "true").lower() in {"1", "true", "yes"}
+    turbovec_index_path: Path = Path(os.getenv("TURBOVEC_INDEX_PATH", str(ROOT_DIR / "artifacts" / "hotpotqa_full" / "turbovec" / "hotpotqa_bge_small_4bit.tvim")))
+    turbovec_bit_width: int = int(os.getenv("TURBOVEC_BIT_WIDTH", "4"))
+    turbovec_dim: int = int(os.getenv("TURBOVEC_DIM", "384"))
+    default_search_method: str = os.getenv("DEFAULT_SEARCH_METHOD", "es_hybrid")
+    hybrid_bm25_k: int = int(os.getenv("HYBRID_BM25_K", "100"))
+    hybrid_dense_k: int = int(os.getenv("HYBRID_DENSE_K", "100"))
 
 settings = Settings()
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import hashlib
@@ -18,19 +18,21 @@ from src.api.history import SearchHistoryStore
 
 from src.core.config import settings
 from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+from src.retrieval.turbovec_retriever import TurboVecHybridRetriever
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "nano_test_queries.tsv"
 BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
 ES_METHODS = {"es_bm25", "es_dense", "es_hybrid", "es_iterative_hybrid"}
+TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
 ES_METHOD_MAP = {
     "es_bm25": "bm25",
     "es_dense": "dense",
     "es_hybrid": "hybrid",
     "es_iterative_hybrid": "iterative_hybrid",
 }
-METHODS = ES_METHODS
+METHODS = ES_METHODS | TV_METHODS
 logger = logging.getLogger("uvicorn.error")
 
 def build_search_cache_key(*, index: str, query: str, method: str, top_k: int) -> str:
@@ -94,7 +96,7 @@ app.add_middleware(
 
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
-    method: str = Field(default="es_hybrid")
+    method: str = Field(default=settings.default_search_method)
     top_k: int = Field(default=10, ge=1, le=50)
 
 
@@ -127,6 +129,20 @@ def get_es_retriever() -> ElasticsearchRetriever:
         embedding_timeout_seconds=settings.embedding_timeout_seconds,
     )
 
+
+
+@lru_cache(maxsize=1)
+def get_tv_retriever() -> TurboVecHybridRetriever:
+    from elasticsearch import Elasticsearch
+
+    es = Elasticsearch(settings.elasticsearch_url, request_timeout=120)
+    return TurboVecHybridRetriever.from_paths(
+        bm25_retriever=get_es_retriever(),
+        es=es,
+        index=settings.elasticsearch_index,
+        tv_index_path=str(settings.turbovec_index_path),
+        model_name=settings.embedding_model,
+    )
 
 def load_query_examples(path: Path = QUERY_EXAMPLES_PATH) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
@@ -297,7 +313,7 @@ def search(request: SearchRequest) -> dict[str, Any]:
                 "url": hit.get("url", ""),
                 "score": float(hit.get("score", 0.0)),
                 "rank": rank,
-                "source": hit.get("source", ES_METHOD_MAP[method]),
+                "source": hit.get("source", ES_METHOD_MAP.get(method, method)),
                 "hop": int(hit.get("hop", 1)),
             }
             for rank, hit in enumerate(hits, start=1)
@@ -314,3 +330,5 @@ def search(request: SearchRequest) -> dict[str, Any]:
         support_doc_ids=find_support_doc_ids(response["query"]),
     )
     return response
+
+
