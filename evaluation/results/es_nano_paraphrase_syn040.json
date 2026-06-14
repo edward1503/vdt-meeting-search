@@ -1,0 +1,89 @@
+{
+  "config": {
+    "dataset_id": "nano-beir/hotpotqa",
+    "index": "hotpotqa_nano_v1",
+    "methods": [
+      "es_bm25",
+      "es_dense",
+      "es_hybrid",
+      "es_iterative_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": null,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 50,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "context_chars": 256,
+    "query_file": "evaluation\\results\\query_paraphrases_50_syn040.tsv"
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.174,
+        "recall@10": 0.87,
+        "mrr@10": 0.9162,
+        "ndcg@10": 0.8171,
+        "full_support_recall@10": 0.74,
+        "latency_p50_ms": 61.1831,
+        "latency_p95_ms": 76.5208,
+        "latency_p99_ms": 82.4196,
+        "qps": 15.9779,
+        "queries": 50
+      },
+      "run_file": "evaluation\\runs\\paraphrase\\syn040\\es_bm25_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_dense",
+      "metrics": {
+        "precision@10": 0.172,
+        "recall@10": 0.86,
+        "mrr@10": 0.8872,
+        "ndcg@10": 0.8134,
+        "full_support_recall@10": 0.74,
+        "latency_p50_ms": 89.8142,
+        "latency_p95_ms": 112.2846,
+        "latency_p99_ms": 23465.9349,
+        "qps": 1.7894,
+        "queries": 50
+      },
+      "run_file": "evaluation\\runs\\paraphrase\\syn040\\es_dense_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_hybrid",
+      "metrics": {
+        "precision@10": 0.18,
+        "recall@10": 0.9,
+        "mrr@10": 0.9253,
+        "ndcg@10": 0.8536,
+        "full_support_recall@10": 0.8,
+        "latency_p50_ms": 151.4565,
+        "latency_p95_ms": 180.4794,
+        "latency_p99_ms": 477.6633,
+        "qps": 6.2225,
+        "queries": 50
+      },
+      "run_file": "evaluation\\runs\\paraphrase\\syn040\\es_hybrid_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_iterative_hybrid",
+      "metrics": {
+        "precision@10": 0.176,
+        "recall@10": 0.88,
+        "mrr@10": 0.9,
+        "ndcg@10": 0.8171,
+        "full_support_recall@10": 0.78,
+        "latency_p50_ms": 966.0315,
+        "latency_p95_ms": 1144.3947,
+        "latency_p99_ms": 1262.7143,
+        "qps": 1.0158,
+        "queries": 50
+      },
+      "run_file": "evaluation\\runs\\paraphrase\\syn040\\es_iterative_hybrid_nano-beir_hotpotqa_top10.trec"
+    }
+  ]
+}

@@ -51,7 +51,11 @@ def main() -> None:
 
     search_parser = subparsers.add_parser("search")
     search_parser.add_argument("--index", default="hotpotqa_docs_current")
-    search_parser.add_argument("--method", choices=["bm25", "dense", "hybrid", "iterative_hybrid"], default="bm25")
+    search_parser.add_argument(
+        "--method",
+        choices=["bm25", "dense", "hybrid", "iterative_hybrid", "iterative_title", "iterative_sentence", "iterative_fast"],
+        default="bm25",
+    )
     search_parser.add_argument("--query", required=True)
     search_parser.add_argument("--top-k", type=int, default=5)
     search_parser.add_argument("--candidate-k", type=int, default=100)
@@ -132,7 +136,19 @@ def search_index(args: argparse.Namespace) -> None:
         model_name=args.model,
         num_candidates=args.num_candidates,
     )
-    hits = retriever.search(args.query, args.method, args.top_k, candidate_k=args.candidate_k)
+    if args.method in {"iterative_title", "iterative_sentence", "iterative_fast"}:
+        mode = {"iterative_title": "title", "iterative_sentence": "sentence", "iterative_fast": "title"}[args.method]
+        hits = retriever.search_iterative_hybrid(
+            args.query,
+            args.top_k,
+            candidate_k=min(args.candidate_k, 30) if args.method == "iterative_fast" else args.candidate_k,
+            first_hop_k=3 if args.method == "iterative_fast" else 5,
+            second_hop_k=5 if args.method == "iterative_fast" else 10,
+            expansion_mode=mode,
+            dedupe_hop2=True,
+        )
+    else:
+        hits = retriever.search(args.query, args.method, args.top_k, candidate_k=args.candidate_k)
     print(json.dumps({"query": args.query, "method": args.method, "results": hits}, ensure_ascii=False, indent=2))
 
 

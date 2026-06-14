@@ -1,0 +1,107 @@
+{
+  "config": {
+    "dataset_id": "nano-beir/hotpotqa",
+    "index": "hotpotqa_100k_v1",
+    "methods": [
+      "es_hybrid",
+      "es_iterative_hybrid",
+      "es_iterative_title",
+      "es_iterative_sentence",
+      "es_iterative_fast"
+    ],
+    "top_k": 10,
+    "max_queries": null,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 300,
+    "candidate_k": 50,
+    "queries": 82,
+    "rrf_k": 30,
+    "first_hop_k": 3,
+    "second_hop_k": 5,
+    "context_chars": 256,
+    "query_file": "artifacts\\hotpotqa_100k\\eval\\queries_100k_validation.tsv",
+    "qrels_file": "artifacts\\hotpotqa_100k\\eval\\qrels_100k_validation.tsv"
+  },
+  "results": [
+    {
+      "method": "es_hybrid",
+      "metrics": {
+        "precision@10": 0.1793,
+        "recall@10": 0.8963,
+        "mrr@10": 0.9106,
+        "ndcg@10": 0.8598,
+        "full_support_recall@10": 0.8171,
+        "latency_p50_ms": 213.7989,
+        "latency_p95_ms": 469.8524,
+        "latency_p99_ms": 69937.645,
+        "qps": 0.9159,
+        "queries": 82
+      },
+      "run_file": "evaluation\\runs\\100k_iterative\\es_hybrid_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_iterative_hybrid",
+      "metrics": {
+        "precision@10": 0.178,
+        "recall@10": 0.8902,
+        "mrr@10": 0.6507,
+        "ndcg@10": 0.6403,
+        "full_support_recall@10": 0.8171,
+        "latency_p50_ms": 834.3614,
+        "latency_p95_ms": 1385.7419,
+        "latency_p99_ms": 2023.8462,
+        "qps": 1.0708,
+        "queries": 82
+      },
+      "run_file": "evaluation\\runs\\100k_iterative\\es_iterative_hybrid_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_iterative_title",
+      "metrics": {
+        "precision@10": 0.1744,
+        "recall@10": 0.872,
+        "mrr@10": 0.4507,
+        "ndcg@10": 0.5482,
+        "full_support_recall@10": 0.7927,
+        "latency_p50_ms": 692.9621,
+        "latency_p95_ms": 903.5989,
+        "latency_p99_ms": 1193.9777,
+        "qps": 1.3964,
+        "queries": 82
+      },
+      "run_file": "evaluation\\runs\\100k_iterative\\es_iterative_title_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_iterative_sentence",
+      "metrics": {
+        "precision@10": 0.178,
+        "recall@10": 0.8902,
+        "mrr@10": 0.6064,
+        "ndcg@10": 0.6287,
+        "full_support_recall@10": 0.8293,
+        "latency_p50_ms": 787.0487,
+        "latency_p95_ms": 1000.126,
+        "latency_p99_ms": 1233.09,
+        "qps": 1.25,
+        "queries": 82
+      },
+      "run_file": "evaluation\\runs\\100k_iterative\\es_iterative_sentence_nano-beir_hotpotqa_top10.trec"
+    },
+    {
+      "method": "es_iterative_fast",
+      "metrics": {
+        "precision@10": 0.1732,
+        "recall@10": 0.8659,
+        "mrr@10": 0.4731,
+        "ndcg@10": 0.5573,
+        "full_support_recall@10": 0.7805,
+        "latency_p50_ms": 635.1855,
+        "latency_p95_ms": 718.1639,
+        "latency_p99_ms": 833.1933,
+        "qps": 1.5588,
+        "queries": 82
+      },
+      "run_file": "evaluation\\runs\\100k_iterative\\es_iterative_fast_nano-beir_hotpotqa_top10.trec"
+    }
+  ]
+}

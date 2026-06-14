@@ -78,3 +78,20 @@ Open `http://localhost:3001`.
 
 - `docs/baseline/report-baseline.md`: technical report and benchmark results.
 - `docs/baseline/elasticsearch-baseline.md`: lean Elasticsearch commands and policy.
+- `docs/baseline/paraphrase-robustness-report.md`: 50-query paraphrase robustness benchmark report.
+
+## Paraphrase Robustness Benchmark
+
+Generate deterministic synonym paraphrases for 50 HotpotQA queries:
+
+```bash
+python scripts/paraphrase_queries.py --input evaluation/results/nano_test_queries.tsv --limit 50 --ratios 0.2,0.4,0.6 --variants-per-ratio 1 --seed 13
+```
+
+Benchmark the original 50-query baseline and each paraphrase ratio with `--query-file`. Compare against the original run:
+
+```bash
+python scripts/compare_paraphrase_results.py --baseline evaluation/results/es_nano_original_50.json --variant syn020=evaluation/results/es_nano_paraphrase_syn020.json --variant syn040=evaluation/results/es_nano_paraphrase_syn040.json --variant syn060=evaluation/results/es_nano_paraphrase_syn060.json --output evaluation/results/paraphrase_summary.csv
+```
+
+Current artifacts are written under `evaluation/results/` and TREC runs under `evaluation/runs/paraphrase/`.

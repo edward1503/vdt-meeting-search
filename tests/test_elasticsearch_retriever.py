@@ -82,6 +82,58 @@ def test_iterative_hybrid_expands_from_first_hop_docs_and_fuses(monkeypatch):
     assert hits[0]['hop'] == 2
     assert hits[1]['hop'] == 1
 
+def test_expand_query_title_only_uses_question_and_title():
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    hit = {'title': 'Bridge Title', 'text': 'Sentence one. Sentence two.'}
+
+    expanded = retriever._expand_query('original question', hit, context_chars=256, expansion_mode='title')
+
+    assert expanded == 'original question Bridge Title'
+
+def test_expand_query_sentence_uses_best_overlap_sentence():
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    hit = {'title': 'Bridge Title', 'text': 'Unrelated opening. Ada Lovelace wrote notes about the Analytical Engine.'}
+
+    expanded = retriever._expand_query('Who wrote notes for the Analytical Engine?', hit, context_chars=256, expansion_mode='sentence')
+
+    assert expanded == 'Who wrote notes for the Analytical Engine? Bridge Title Ada Lovelace wrote notes about the Analytical Engine'
+
+def test_iterative_hybrid_dedupes_hop2_docs(monkeypatch):
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    calls = []
+
+    def fake_search(query, method, top_k, candidate_k=100, rrf_k=60):
+        calls.append({'query': query, 'method': method, 'top_k': top_k})
+        if len(calls) == 1:
+            return [{'doc_id': 'bridge', 'title': 'Bridge', 'text': 'Bridge text', 'source': 'hybrid'}]
+        return [
+            {'doc_id': 'bridge', 'title': 'Bridge', 'text': 'Bridge text again', 'source': 'hybrid'},
+            {'doc_id': 'answer', 'title': 'Answer', 'text': 'Answer text', 'source': 'hybrid'},
+        ]
+
+    monkeypatch.setattr(retriever, 'search', fake_search)
+
+    hits = retriever.search_iterative_hybrid(
+        'question',
+        top_k=2,
+        candidate_k=10,
+        rrf_k=30,
+        first_hop_k=1,
+        second_hop_k=2,
+        context_chars=256,
+        expansion_mode='title',
+        dedupe_hop2=True,
+    )
+
+    assert [hit['doc_id'] for hit in hits] == ['bridge', 'answer']
+    assert len({hit['doc_id'] for hit in hits}) == len(hits)
+
 
 def test_query_builders_and_rrf_are_stable():
     assert build_bm25_query('ada', 5)['query']['multi_match']['fields'] == ['title^2', 'content']
