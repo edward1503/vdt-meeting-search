@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import re
@@ -37,19 +37,46 @@ def bulk_action(index: str, row: dict[str, Any], embedding: list[float]) -> dict
         "embedding": embedding,
     }
 
+def build_bm25_index_body(shards: int = 1) -> dict[str, Any]:
+    return {
+        "settings": {"number_of_shards": shards, "number_of_replicas": 0, "refresh_interval": "-1"},
+        "mappings": {
+            "properties": {
+                "numeric_id": {"type": "long"},
+                "doc_id": {"type": "keyword"},
+                "title": {"type": "text"},
+                "text": {"type": "text"},
+                "url": {"type": "keyword"},
+                "content": {"type": "text"},
+            }
+        },
+    }
+
+
+def bm25_bulk_action(index: str, row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "_index": index,
+        "_id": row["doc_id"],
+        "numeric_id": int(row["numeric_id"]),
+        "doc_id": row["doc_id"],
+        "title": row.get("title", ""),
+        "text": row.get("text", ""),
+        "url": row.get("url", ""),
+        "content": row.get("content", ""),
+    }
 
 def build_bm25_query(query: str, top_k: int) -> dict[str, Any]:
     return {
         "size": top_k,
         "track_total_hits": False,
-        "_source": ["doc_id", "title", "text", "url"],
+        "_source": ["numeric_id", "doc_id", "title", "text", "url"],
         "query": {"multi_match": {"query": query, "fields": ["title^2", "content"]}},
     }
 
 
 def build_knn_query(vector: list[float], top_k: int, num_candidates: int) -> dict[str, Any]:
     return {
-        "_source": ["doc_id", "title", "text", "url"],
+        "_source": ["numeric_id", "doc_id", "title", "text", "url"],
         "knn": {"field": "embedding", "query_vector": vector, "k": top_k, "num_candidates": num_candidates},
     }
 
@@ -218,3 +245,4 @@ def _vector_to_list(vector: Any) -> list[float]:
     if hasattr(vector, "tolist"):
         return [float(value) for value in vector.tolist()]
     return [float(value) for value in vector]
+

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 
@@ -39,3 +39,20 @@ def test_main_dispatches_ingest_subcommand(monkeypatch, tmp_path):
     cli.main()
 
     assert called == {"command": "ingest"}
+
+
+def test_main_dispatches_ingest_bm25_subcommand(monkeypatch, tmp_path):
+    called = {}
+
+    def fake_ingest_bm25(args):
+        called["command"] = args.command
+
+    monkeypatch.setattr(cli, "ingest_bm25", fake_ingest_bm25)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["es_hotpotqa.py", "ingest-bm25", "--staging-dir", str(tmp_path), "--progress-dir", str(tmp_path)],
+    )
+
+    cli.main()
+
+    assert called == {"command": "ingest-bm25"}

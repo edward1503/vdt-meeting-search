@@ -1,7 +1,38 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from src.retrieval.elasticsearch_retriever import build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
+from src.retrieval.elasticsearch_retriever import build_bm25_index_body, bm25_bulk_action, build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
 
+
+
+def test_build_bm25_index_body_excludes_dense_vector_and_keeps_numeric_id():
+    body = build_bm25_index_body(shards=3)
+
+    props = body["mappings"]["properties"]
+    assert props["numeric_id"] == {"type": "long"}
+    assert props["doc_id"] == {"type": "keyword"}
+    assert props["content"] == {"type": "text"}
+    assert "embedding" not in props
+    assert body["settings"]["number_of_shards"] == 3
+
+
+def test_bm25_bulk_action_uses_numeric_id_and_excludes_embedding_text():
+    row = {
+        "numeric_id": 7,
+        "doc_id": "d7",
+        "title": "T",
+        "text": "X",
+        "url": "",
+        "content": "T\nX",
+        "embedding_text": "T\nX",
+    }
+
+    action = bm25_bulk_action("idx", row)
+
+    assert action["_index"] == "idx"
+    assert action["_id"] == "d7"
+    assert action["numeric_id"] == 7
+    assert "embedding" not in action
+    assert "embedding_text" not in action
 
 def test_build_index_body_has_text_and_vector_fields():
     body = build_index_body(dims=384)
@@ -180,3 +211,4 @@ def test_dense_search_uses_embedding_service_when_configured(monkeypatch):
 
     assert hits[0]["doc_id"] == "d1"
     assert requests == [{"url": "http://embedding.local/embed", "body": '{"text":"hello"}', "timeout": 30}]
+
