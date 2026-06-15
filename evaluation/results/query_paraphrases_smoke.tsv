@@ -1,0 +1,3 @@
+variant_query_id	source_query_id	ratio	variant_index	query	changed_terms	actual_change_ratio
+5ae5669755429960a22e02ec::syn020::v1	5ae5669755429960a22e02ec	0.20	1	Which of the campaign that brought out the term Vichy Republican on social media was formally launched on June 16, 2015, at Trump Tower in New York City?		0.0000
+5a811667554299260e20a23d::syn020::v1	5a811667554299260e20a23d	0.20	1	What professions do both Ian Hunter and Rob Thomas have?	occupations->professions	1.0000

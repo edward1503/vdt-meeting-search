@@ -1,0 +1,25 @@
+biên bản từ mô hình  ASR  nội dung là các cuộc họp
+nội dung ngắn/dài, số lượng nhiều
+lỗi chính tả từ ASR -> denois
+=> kết hợp hybrid search nhằm đảm bảo accuracy + real time latency
+
+Prompt Based thì thử nghiệm nhiều phương pháp truy vấn
+chỉ cần là bài toán lân cận
+
+10/6
+
+test trên tập tương tự nhưng paraphrase lại -> bench tiếp để đánh giá stable của Bm25/từ nằm ngoài index của Bm25
+
+mở rộng dataset để test lại acc
+
+13/6
+
+bm25 on pytorch cho buid index nhanh hơn + embedding = api
+
+test tiếp trên bộ paraphrase, ingest 5m (ƯU TIÊN bài toán scale + acc + latency trước VỚI HYBRID SEARCH)
+
+thử nghiệm trên tiếng việt tiếp (phụ)
+
+gửi mail 4 ông tác giả xin license
+
+nghiên cứu lại về NDCG cho bài toán

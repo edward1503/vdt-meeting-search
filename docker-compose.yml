@@ -16,5 +16,66 @@ services:
       timeout: 5s
       retries: 30
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: vdt-hotpotqa-redis
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: vdt-hotpotqa-api
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-hotpotqa_nano_current}
+      - REDIS_URL=redis://redis:6379/0
+      - SEARCH_CACHE_TTL_SECONDS=${SEARCH_CACHE_TTL_SECONDS:-300}
+      - PYTHONPATH=/app
+      - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://host.docker.internal:8010/embed}
+      - EMBEDDING_TIMEOUT_SECONDS=${EMBEDDING_TIMEOUT_SECONDS:-30}
+      - WARMUP_EMBEDDING_MODEL=${WARMUP_EMBEDDING_MODEL:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./evaluation:/app/evaluation
+      - ./artifacts:/app/artifacts
+      - history_data:/app/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: vdt-hotpotqa-frontend
+    environment:
+      - VITE_API_BASE_URL=/api
+      - VITE_API_PROXY_TARGET=http://api:8000
+      - CHOKIDAR_USEPOLLING=true
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - api
+
 volumes:
   esdata:
+  frontend_node_modules:
+  history_data:

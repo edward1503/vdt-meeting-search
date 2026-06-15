@@ -74,6 +74,10 @@ ir_datasets
 
 `es_hybrid` là cấu hình tốt nhất hiện tại theo quality/latency. `es_iterative_hybrid` là baseline multi-hop explicit để debug evidence chain, nhưng latency cao hơn nhiều.
 
+## Robustness report
+
+Xem thêm `docs/baseline/paraphrase-robustness-report.md` để biết thí nghiệm paraphrase 50 queries theo các mức `syn020`, `syn040`, `syn060`, cùng bảng delta metric so với original baseline.
+
 ## Reproduce
 
 ```bash

@@ -8,3 +8,14 @@ benchmark:
 
 api:
 	uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+.PHONY: docker-dev docker-build frontend-build
+
+docker-dev:
+	docker compose up --build elasticsearch redis api frontend
+
+docker-build:
+	docker compose build
+
+frontend-build:
+	cd frontend && npm run build

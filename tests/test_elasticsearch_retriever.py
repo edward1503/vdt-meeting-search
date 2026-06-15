@@ -1,7 +1,76 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-from src.retrieval.elasticsearch_retriever import build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
+from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever, build_bm25_index_body, bm25_bulk_action, build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
 
+
+
+def test_build_bm25_index_body_excludes_dense_vector_and_keeps_numeric_id():
+    body = build_bm25_index_body(shards=3)
+
+    props = body["mappings"]["properties"]
+    assert props["numeric_id"] == {"type": "long"}
+    assert props["doc_id"] == {"type": "keyword"}
+    assert props["content"] == {"type": "text"}
+    assert "embedding" not in props
+    assert body["settings"]["number_of_shards"] == 3
+
+
+def test_bm25_bulk_action_uses_numeric_id_and_excludes_embedding_text():
+    row = {
+        "numeric_id": 7,
+        "doc_id": "d7",
+        "title": "T",
+        "text": "X",
+        "url": "",
+        "content": "T\nX",
+        "embedding_text": "T\nX",
+    }
+
+    action = bm25_bulk_action("idx", row)
+
+    assert action["_index"] == "idx"
+    assert action["_id"] == "d7"
+    assert action["numeric_id"] == 7
+    assert "embedding" not in action
+    assert "embedding_text" not in action
+
+def test_bm25_search_preserves_numeric_id_from_source():
+    class FakeES:
+        def search(self, index, body):
+            assert index == "idx"
+            return {
+                "hits": {
+                    "hits": [
+                        {
+                            "_id": "d7",
+                            "_score": 2.5,
+                            "_source": {
+                                "numeric_id": 7,
+                                "doc_id": "d7",
+                                "title": "Title",
+                                "text": "Body",
+                                "url": "",
+                            },
+                        }
+                    ]
+                }
+            }
+
+    retriever = ElasticsearchRetriever(es=FakeES(), index="idx", model_name="model")
+
+    hits = retriever.search("query", "bm25", top_k=1)
+
+    assert hits == [
+        {
+            "numeric_id": 7,
+            "doc_id": "d7",
+            "title": "Title",
+            "text": "Body",
+            "url": "",
+            "score": 2.5,
+            "source": "bm25",
+        }
+    ]
 
 def test_build_index_body_has_text_and_vector_fields():
     body = build_index_body(dims=384)
@@ -82,6 +151,58 @@ def test_iterative_hybrid_expands_from_first_hop_docs_and_fuses(monkeypatch):
     assert hits[0]['hop'] == 2
     assert hits[1]['hop'] == 1
 
+def test_expand_query_title_only_uses_question_and_title():
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    hit = {'title': 'Bridge Title', 'text': 'Sentence one. Sentence two.'}
+
+    expanded = retriever._expand_query('original question', hit, context_chars=256, expansion_mode='title')
+
+    assert expanded == 'original question Bridge Title'
+
+def test_expand_query_sentence_uses_best_overlap_sentence():
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    hit = {'title': 'Bridge Title', 'text': 'Unrelated opening. Ada Lovelace wrote notes about the Analytical Engine.'}
+
+    expanded = retriever._expand_query('Who wrote notes for the Analytical Engine?', hit, context_chars=256, expansion_mode='sentence')
+
+    assert expanded == 'Who wrote notes for the Analytical Engine? Bridge Title Ada Lovelace wrote notes about the Analytical Engine'
+
+def test_iterative_hybrid_dedupes_hop2_docs(monkeypatch):
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    retriever = ElasticsearchRetriever(es=None, index='idx', model_name='model')
+    calls = []
+
+    def fake_search(query, method, top_k, candidate_k=100, rrf_k=60):
+        calls.append({'query': query, 'method': method, 'top_k': top_k})
+        if len(calls) == 1:
+            return [{'doc_id': 'bridge', 'title': 'Bridge', 'text': 'Bridge text', 'source': 'hybrid'}]
+        return [
+            {'doc_id': 'bridge', 'title': 'Bridge', 'text': 'Bridge text again', 'source': 'hybrid'},
+            {'doc_id': 'answer', 'title': 'Answer', 'text': 'Answer text', 'source': 'hybrid'},
+        ]
+
+    monkeypatch.setattr(retriever, 'search', fake_search)
+
+    hits = retriever.search_iterative_hybrid(
+        'question',
+        top_k=2,
+        candidate_k=10,
+        rrf_k=30,
+        first_hop_k=1,
+        second_hop_k=2,
+        context_chars=256,
+        expansion_mode='title',
+        dedupe_hop2=True,
+    )
+
+    assert [hit['doc_id'] for hit in hits] == ['bridge', 'answer']
+    assert len({hit['doc_id'] for hit in hits}) == len(hits)
+
 
 def test_query_builders_and_rrf_are_stable():
     assert build_bm25_query('ada', 5)['query']['multi_match']['fields'] == ['title^2', 'content']
@@ -89,3 +210,43 @@ def test_query_builders_and_rrf_are_stable():
 
     fused = fuse_rrf([[{'doc_id': 'a'}, {'doc_id': 'b'}], [{'doc_id': 'b'}, {'doc_id': 'c'}]], top_k=3)
     assert [hit['doc_id'] for hit in fused] == ['b', 'a', 'c']
+
+
+def test_dense_search_uses_embedding_service_when_configured(monkeypatch):
+    from io import BytesIO
+    from src.retrieval import elasticsearch_retriever as module
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    requests = []
+
+    class FakeResponse:
+        def __enter__(self):
+            return BytesIO(b'{"embedding":[0.1,0.2,0.3]}')
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(request, timeout):
+        requests.append({"url": request.full_url, "body": request.data.decode("utf-8"), "timeout": timeout})
+        return FakeResponse()
+
+    monkeypatch.setattr(module.request, "urlopen", fake_urlopen)
+
+    class FakeES:
+        def search(self, index, body):
+            assert index == "idx"
+            assert body["knn"]["query_vector"] == [0.1, 0.2, 0.3]
+            return {"hits": {"hits": [{"_id": "d1", "_score": 1.0, "_source": {"doc_id": "d1", "title": "T"}}]}}
+
+    retriever = ElasticsearchRetriever(
+        es=FakeES(),
+        index="idx",
+        model_name="model",
+        embedding_service_url="http://embedding.local/embed",
+    )
+
+    hits = retriever.search("hello", "dense", top_k=1)
+
+    assert hits[0]["doc_id"] == "d1"
+    assert requests == [{"url": "http://embedding.local/embed", "body": '{"text":"hello"}', "timeout": 30}]
+

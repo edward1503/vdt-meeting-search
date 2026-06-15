@@ -1,0 +1,39 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_v1",
+    "methods": [
+      "tv_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 200,
+    "candidate_k": 200,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "context_chars": 256,
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.1495,
+        "recall@10": 0.7475,
+        "mrr@10": 0.8695,
+        "ndcg@10": 0.7282,
+        "full_support_recall@10": 0.54,
+        "latency_p50_ms": 811.1356,
+        "latency_p95_ms": 2528.67,
+        "latency_p99_ms": 3072.7415,
+        "qps": 0.8488,
+        "queries": 200
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\tune_k200_rrf30\\tv_hybrid_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

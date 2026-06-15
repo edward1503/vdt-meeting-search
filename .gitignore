@@ -30,12 +30,15 @@ data/*.zip
 *.json
 !evaluation/*.json
 !evaluation/results/*.json
+!evaluation/results/hotpotqa_full/*.json
 !docs/*.json
 
 # Local generated indexes/cache
 data/indexes/
 data/cache/
 artifacts/
+hotpotqa_bge_embeddings.tar.gz
+hotpotqa_bge_embeddings/
 
 # Models
 models/
@@ -62,3 +65,17 @@ logs/
 
 # Local brainstorming companion
 .superpowers/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+hotpotqa-retrieval-dashboard/node_modules/
+hotpotqa-retrieval-dashboard/dist/
+
+# Harness durable layer
+harness.db
+harness.db-wal
+harness.db-shm
+scripts/bin/harness-cli
+scripts/bin/harness-cli.exe

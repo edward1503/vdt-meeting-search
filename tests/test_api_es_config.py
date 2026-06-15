@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from src.core.config import Settings
 from types import SimpleNamespace
@@ -66,3 +66,57 @@ def test_load_benchmark_result_reads_json(tmp_path):
         "config": {"queries": 1},
         "results": [{"method": "es_bm25"}],
     }
+
+
+def test_api_exposes_turbovec_methods_and_settings():
+    from src.api import main
+
+    settings = Settings()
+
+    assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(main.METHODS)
+    assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(set(main.stats()["methods"]))
+    assert settings.default_search_method == "tv_hybrid"
+    assert main.SearchRequest(query="Who connects Alpha and Beta?").method == "tv_hybrid"
+    assert settings.turbovec_bit_width == 4
+    assert settings.turbovec_dim == 384
+    assert settings.hybrid_bm25_k == 100
+    assert settings.hybrid_dense_k == 100
+
+def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
+    from src.api import main
+
+    calls = []
+
+    class FakeTVRetriever:
+        last_timing_ms = {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
+
+        def search(self, query, method, top_k, bm25_k=100, dense_k=100, rrf_k=60):
+            calls.append((query, method, top_k, bm25_k, dense_k, rrf_k))
+            return [
+                {
+                    "doc_id": "d1",
+                    "title": "Doc 1",
+                    "text": "body",
+                    "url": "",
+                    "score": 1.0,
+                    "source": "bm25+dense",
+                }
+            ]
+
+    class FakeHistoryStore:
+        def record_search(self, **kwargs):
+            return 123
+
+    monkeypatch.setattr(main, "read_search_cache", lambda cache_key: None)
+    monkeypatch.setattr(main, "write_search_cache", lambda cache_key, payload: None)
+    monkeypatch.setattr(main, "get_history_store", lambda: FakeHistoryStore())
+    monkeypatch.setattr(main, "find_support_doc_ids", lambda query: [])
+    monkeypatch.setattr(main, "get_tv_retriever", lambda: FakeTVRetriever())
+
+    response = main.search(main.SearchRequest(query="Who connects Alpha and Beta?", method="tv_hybrid", top_k=1))
+
+    assert calls == [("Who connects Alpha and Beta?", "tv_hybrid", 1, 100, 100, 60)]
+    assert response["method"] == "tv_hybrid"
+    assert response["history_id"] == 123
+    assert response["latency_breakdown_ms"] == {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
+    assert response["results"][0]["source"] == "bm25+dense"

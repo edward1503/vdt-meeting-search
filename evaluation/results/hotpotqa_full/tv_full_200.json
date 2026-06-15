@@ -1,0 +1,73 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_v1",
+    "methods": [
+      "es_bm25",
+      "tv_dense",
+      "tv_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "context_chars": 256,
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.1205,
+        "recall@10": 0.6025,
+        "mrr@10": 0.7108,
+        "ndcg@10": 0.5727,
+        "full_support_recall@10": 0.365,
+        "latency_p50_ms": 126.3355,
+        "latency_p95_ms": 359.6319,
+        "latency_p99_ms": 731.5949,
+        "qps": 5.9315,
+        "queries": 200
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\es_bm25_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_dense",
+      "metrics": {
+        "precision@10": 0.1445,
+        "recall@10": 0.7225,
+        "mrr@10": 0.8472,
+        "ndcg@10": 0.7082,
+        "full_support_recall@10": 0.515,
+        "latency_p50_ms": 572.2161,
+        "latency_p95_ms": 868.0033,
+        "latency_p99_ms": 1214.8422,
+        "qps": 1.2499,
+        "queries": 200
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\tv_dense_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.15,
+        "recall@10": 0.75,
+        "mrr@10": 0.8681,
+        "ndcg@10": 0.7286,
+        "full_support_recall@10": 0.545,
+        "latency_p50_ms": 1004.3562,
+        "latency_p95_ms": 3089.2229,
+        "latency_p99_ms": 4072.7476,
+        "qps": 0.7935,
+        "queries": 200
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\tv_hybrid_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

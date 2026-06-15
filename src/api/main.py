@@ -1,7 +1,10 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
+import hashlib
 import json
+import logging
+import threading
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -11,21 +14,75 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from src.api.history import SearchHistoryStore
+
 from src.core.config import settings
 from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+from src.retrieval.turbovec_retriever import TurboVecHybridRetriever
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "nano_test_queries.tsv"
 BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
 ES_METHODS = {"es_bm25", "es_dense", "es_hybrid", "es_iterative_hybrid"}
+TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
 ES_METHOD_MAP = {
     "es_bm25": "bm25",
     "es_dense": "dense",
     "es_hybrid": "hybrid",
     "es_iterative_hybrid": "iterative_hybrid",
 }
-METHODS = ES_METHODS
+METHODS = ES_METHODS | TV_METHODS
+logger = logging.getLogger("uvicorn.error")
+
+def build_search_cache_key(*, index: str, query: str, method: str, top_k: int) -> str:
+    payload = json.dumps(
+        {
+            "index": index,
+            "method": method,
+            "query": query.strip(),
+            "top_k": top_k,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"search:v1:{digest}"
+
+@lru_cache(maxsize=1)
+def get_redis_client() -> Any | None:
+    if not settings.redis_url:
+        return None
+    try:
+        from redis import Redis
+
+        return Redis.from_url(settings.redis_url, decode_responses=True)
+    except Exception:
+        return None
+
+def read_search_cache(cache_key: str) -> dict[str, Any] | None:
+    client = get_redis_client()
+    if client is None:
+        return None
+    try:
+        cached = client.get(cache_key)
+        if not cached:
+            return None
+        payload = json.loads(cached)
+        payload["cache_hit"] = True
+        payload["latency_ms"] = 0.0
+        return payload
+    except Exception:
+        return None
+
+def write_search_cache(cache_key: str, payload: dict[str, Any]) -> None:
+    client = get_redis_client()
+    if client is None:
+        return
+    try:
+        client.setex(cache_key, settings.search_cache_ttl_seconds, json.dumps(payload))
+    except Exception:
+        return
 
 app = FastAPI(title="HotpotQA Elasticsearch Retrieval", version="0.1.0")
 app.add_middleware(
@@ -39,9 +96,25 @@ app.add_middleware(
 
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1)
-    method: str = Field(default="es_hybrid")
+    method: str = Field(default=settings.default_search_method)
     top_k: int = Field(default=10, ge=1, le=50)
 
+
+@lru_cache(maxsize=1)
+def get_history_store() -> SearchHistoryStore:
+    store = SearchHistoryStore(settings.history_db_path)
+    store.init_db()
+    return store
+
+
+def find_support_doc_ids(query: str) -> list[str]:
+    normalized = query.strip().lower()
+    if not normalized:
+        return []
+    for row in get_query_examples():
+        if str(row.get("query", "")).strip().lower() == normalized:
+            return [str(doc_id) for doc_id in row.get("support_doc_ids", [])]
+    return []
 
 @lru_cache(maxsize=1)
 def get_es_retriever() -> ElasticsearchRetriever:
@@ -52,8 +125,24 @@ def get_es_retriever() -> ElasticsearchRetriever:
         index=settings.elasticsearch_index,
         model_name=settings.embedding_model,
         num_candidates=settings.elasticsearch_num_candidates,
+        embedding_service_url=settings.embedding_service_url,
+        embedding_timeout_seconds=settings.embedding_timeout_seconds,
     )
 
+
+
+@lru_cache(maxsize=1)
+def get_tv_retriever() -> TurboVecHybridRetriever:
+    from elasticsearch import Elasticsearch
+
+    es = Elasticsearch(settings.elasticsearch_url, request_timeout=120)
+    return TurboVecHybridRetriever.from_paths(
+        bm25_retriever=get_es_retriever(),
+        es=es,
+        index=settings.elasticsearch_index,
+        tv_index_path=str(settings.turbovec_index_path),
+        model_name=settings.embedding_model,
+    )
 
 def load_query_examples(path: Path = QUERY_EXAMPLES_PATH) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
@@ -120,6 +209,21 @@ def get_benchmark_result() -> dict[str, Any]:
     return load_benchmark_result()
 
 
+def warm_embedding_model() -> None:
+    start = time.perf_counter()
+    logger.info("Warming embedding model %s", settings.embedding_model)
+    try:
+        get_es_retriever()._embed_query("warmup")
+    except Exception:
+        logger.exception("Embedding model warm-up failed")
+        return
+    logger.info("Embedding model warm-up finished in %.2fs", time.perf_counter() - start)
+
+@app.on_event("startup")
+def start_embedding_warmup() -> None:
+    if settings.warmup_embedding_model:
+        thread = threading.Thread(target=warm_embedding_model, name="embedding-model-warmup", daemon=True)
+        thread.start()
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -130,7 +234,13 @@ def stats() -> dict[str, Any]:
     return {
         "backend": "elasticsearch",
         "index": settings.elasticsearch_index,
-        "methods": sorted(ES_METHODS),
+        "methods": sorted(METHODS),
+        "dataset_id": settings.dataset_id,
+        "embedding_model": settings.embedding_model,
+        "embedding_service_url": settings.embedding_service_url,
+        "num_candidates": settings.elasticsearch_num_candidates,
+        "search_cache_ttl_seconds": settings.search_cache_ttl_seconds,
+        "history_db_path": str(settings.history_db_path),
     }
 
 
@@ -145,20 +255,69 @@ def benchmark() -> dict[str, Any]:
     return get_benchmark_result()
 
 
+@app.get("/history")
+def history(limit: int = 100) -> dict[str, Any]:
+    bounded_limit = max(1, min(limit, 500))
+    rows = get_history_store().list_history(bounded_limit)
+    return {"count": len(rows), "history": rows}
+
+@app.get("/history/{history_id}")
+def history_detail(history_id: int) -> dict[str, Any]:
+    row = get_history_store().get_history(history_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="History entry not found")
+    return row
+
+@app.delete("/history")
+def clear_history() -> dict[str, int]:
+    return {"deleted": get_history_store().clear_history()}
 @app.post("/search")
 def search(request: SearchRequest) -> dict[str, Any]:
     method = request.method.strip().lower()
     if method not in METHODS:
         raise HTTPException(status_code=400, detail=f"Unknown method: {request.method}")
 
+    cache_key = build_search_cache_key(
+        index=settings.elasticsearch_index,
+        query=request.query,
+        method=method,
+        top_k=request.top_k,
+    )
+    cached = read_search_cache(cache_key)
+    if cached is not None:
+        cached["history_id"] = get_history_store().record_search(
+            query=cached["query"],
+            method=cached["method"],
+            top_k=int(cached["top_k"]),
+            latency_ms=float(cached["latency_ms"]),
+            cache_hit=True,
+            results=cached["results"],
+            support_doc_ids=find_support_doc_ids(cached["query"]),
+        )
+        return cached
+
     start = time.perf_counter()
-    hits = get_es_retriever().search(request.query, ES_METHOD_MAP[method], request.top_k)
+    latency_breakdown_ms: dict[str, float] | None = None
+    if method in TV_METHODS:
+        tv_retriever = get_tv_retriever()
+        hits = tv_retriever.search(
+            request.query,
+            method,
+            request.top_k,
+            bm25_k=settings.hybrid_bm25_k,
+            dense_k=settings.hybrid_dense_k,
+            rrf_k=settings.rrf_k,
+        )
+        latency_breakdown_ms = {key: round(float(value), 4) for key, value in tv_retriever.last_timing_ms.items()}
+    else:
+        hits = get_es_retriever().search(request.query, ES_METHOD_MAP[method], request.top_k)
     latency_ms = round((time.perf_counter() - start) * 1000, 4)
-    return {
+    response = {
         "query": request.query,
         "method": method,
         "top_k": request.top_k,
         "latency_ms": latency_ms,
+        "cache_hit": False,
         "results": [
             {
                 "doc_id": hit.get("doc_id", ""),
@@ -167,9 +326,24 @@ def search(request: SearchRequest) -> dict[str, Any]:
                 "url": hit.get("url", ""),
                 "score": float(hit.get("score", 0.0)),
                 "rank": rank,
-                "source": hit.get("source", ES_METHOD_MAP[method]),
+                "source": hit.get("source", ES_METHOD_MAP.get(method, method)),
                 "hop": int(hit.get("hop", 1)),
             }
             for rank, hit in enumerate(hits, start=1)
         ],
     }
+    if latency_breakdown_ms is not None:
+        response["latency_breakdown_ms"] = latency_breakdown_ms
+    write_search_cache(cache_key, response)
+    response["history_id"] = get_history_store().record_search(
+        query=response["query"],
+        method=response["method"],
+        top_k=int(response["top_k"]),
+        latency_ms=float(response["latency_ms"]),
+        cache_hit=bool(response.get("cache_hit", False)),
+        results=response["results"],
+        support_doc_ids=find_support_doc_ids(response["query"]),
+    )
+    return response
+
+
