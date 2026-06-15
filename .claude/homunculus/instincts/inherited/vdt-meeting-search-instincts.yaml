@@ -1,0 +1,619 @@
+# Instincts generated from https://github.com/edward1503/vdt-meeting-search
+# Generated: 2026-06-15T16:48:24.677Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: vdt-meeting-search-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: chore, docs, feat, fix
+
+## Evidence
+
+- 12 commits analyzed
+- Detected conventional commit pattern
+- Examples: chore: checkpoint current repository state, docs: set up sprint 3 harness tracking
+
+---
+id: vdt-meeting-search-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Commit Length
+
+## Action
+
+Keep commit messages concise (~43 characters)
+
+## Evidence
+
+- Average commit message length: 43 chars
+- Based on 12 commits
+
+---
+id: vdt-meeting-search-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Naming Files
+
+## Action
+
+Use snake_case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: snake_case
+
+---
+id: vdt-meeting-search-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: vdt-meeting-search-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: vdt-meeting-search-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: api, core, data, evaluation, retrieval
+
+---
+id: vdt-meeting-search-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: vdt-meeting-search-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Test Naming
+
+## Action
+
+Name test files using the pattern: *.spec.js
+
+## Evidence
+
+- File pattern: *.spec.js
+- Consistent across test files
+
+---
+id: vdt-meeting-search-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Test Types
+
+## Action
+
+Write unit, e2e tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, e2e
+- Coverage config: no
+
+---
+id: vdt-meeting-search-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~13x per month
+- Files: frontend/src/*, frontend/src/components/*, frontend/src/lib/*
+
+---
+id: vdt-meeting-search-workflow-add-or-update-retrieval-pipeline
+trigger: "when doing add or update retrieval pipeline"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Workflow Add Or Update Retrieval Pipeline
+
+## Action
+
+Follow the add-or-update-retrieval-pipeline workflow:
+1. Implement or update retrieval logic in src/retrieval/*.py
+2. Update or add configuration in src/core/config.py
+3. Update or add API integration in src/api/main.py (if needed)
+4. Add or update scripts for data processing or pipeline (scripts/*.py)
+5. Write or update tests in tests/test_*retriever.py and related test files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/retrieval/elasticsearch_retriever.py, src/retrieval/turbovec_retriever.py, src/core/config.py
+
+---
+id: vdt-meeting-search-workflow-benchmark-or-evaluate-retrieval-results
+trigger: "when doing benchmark or evaluate retrieval results"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Workflow Benchmark Or Evaluate Retrieval Results
+
+## Action
+
+Follow the benchmark-or-evaluate-retrieval-results workflow:
+1. Run evaluation scripts to produce results in evaluation/results/* and evaluation/runs/*
+2. Update or create benchmark scripts in src/evaluation/*.py or scripts/verify_*.py
+3. Update sprint or project report in docs/sprint*/sprint*-report.md
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: evaluation/results/*, evaluation/runs/*, src/evaluation/benchmark_es.py
+
+---
+id: vdt-meeting-search-workflow-feature-or-experiment-documentation-and-planning
+trigger: "when doing feature or experiment documentation and planning"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Workflow Feature Or Experiment Documentation And Planning
+
+## Action
+
+Follow the feature-or-experiment-documentation-and-planning workflow:
+1. Create or update plan/spec files in docs/superpowers/plans/* or docs/decisions/*
+2. Update or create epic/story tracking in docs/stories/epics/*
+3. Update sprint or experiment report in docs/sprint*/sprint*-report.md
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: docs/superpowers/plans/*, docs/decisions/*, docs/stories/epics/*
+
+---
+id: vdt-meeting-search-workflow-add-or-update-tests-for-new-pipeline-or-feature
+trigger: "when doing add or update tests for new pipeline or feature"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Workflow Add Or Update Tests For New Pipeline Or Feature
+
+## Action
+
+Follow the add-or-update-tests-for-new-pipeline-or-feature workflow:
+1. Implement or update test files in tests/test_*.py corresponding to new or changed code
+2. Run tests to ensure correctness
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: tests/test_elasticsearch_retriever.py, tests/test_turbovec_retriever.py, tests/test_benchmark_es.py
+
+---
+id: vdt-meeting-search-instinct-file-naming
+trigger: "When creating a new Python file"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct File Naming
+
+## Action
+
+Name the file using snake_case
+
+## Evidence
+
+- Pattern in src/retrieval/elasticsearch_retriever.py
+- Pattern in src/core/config.py
+
+---
+id: vdt-meeting-search-instinct-function-naming
+trigger: "When defining a new function in Python"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: vdt-meeting-search-instinct-class-naming
+trigger: "When defining a new class in Python"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: vdt-meeting-search-instinct-constant-naming
+trigger: "When defining a constant in Python"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constant names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: vdt-meeting-search-instinct-import-alias
+trigger: "When importing modules in Python"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Import Alias
+
+## Action
+
+Use alias-style imports
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: vdt-meeting-search-instinct-export-named
+trigger: "When exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Export Named
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: vdt-meeting-search-instinct-test-file-pattern
+trigger: "When adding a new test file for JavaScript code"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Test File Pattern
+
+## Action
+
+Name the file with a .spec.js suffix
+
+## Evidence
+
+- Pattern in testing.filePattern
+
+---
+id: vdt-meeting-search-instinct-test-types
+trigger: "When writing tests"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Test Types
+
+## Action
+
+Write both unit and end-to-end (e2e) tests as appropriate
+
+## Evidence
+
+- Pattern in testing.testTypes
+
+---
+id: vdt-meeting-search-instinct-python-test-location
+trigger: "When adding tests for Python code"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Python Test Location
+
+## Action
+
+Place test files in the separate tests/ directory
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+- Pattern in tests/test_elasticsearch_retriever.py
+
+---
+id: vdt-meeting-search-instinct-try-catch-errors
+trigger: "When handling errors in Python code"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Try Catch Errors
+
+## Action
+
+Use try-catch (try-except) blocks for error handling
+
+## Evidence
+
+- Pattern in errorHandling.style
+
+---
+id: vdt-meeting-search-instinct-git-conventional-commits
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Git Conventional Commits
+
+## Action
+
+Use conventional commit prefixes: chore, docs, feat, fix
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Seen in commit 'chore: checkpoint current repository state'
+
+---
+id: vdt-meeting-search-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Git Commit Length
+
+## Action
+
+Keep commit message length around 43 characters on average
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: vdt-meeting-search-instinct-add-retrieval-pipeline
+trigger: "When a new retrieval method is needed or an existing one must be updated"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Add Retrieval Pipeline
+
+## Action
+
+Implement or update retrieval logic in src/retrieval/*.py, update config in src/core/config.py, update API in src/api/main.py if needed, add/update scripts in scripts/*.py, and write/update tests in tests/test_*retriever.py
+
+## Evidence
+
+- Workflow: add-or-update-retrieval-pipeline
+- Example files: src/retrieval/elasticsearch_retriever.py, tests/test_elasticsearch_retriever.py
+
+---
+id: vdt-meeting-search-instinct-benchmark-retrieval
+trigger: "When benchmarking retrieval performance or comparing methods"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Benchmark Retrieval
+
+## Action
+
+Run evaluation scripts to produce results in evaluation/results/* and evaluation/runs/*, update or create benchmark scripts in src/evaluation/*.py or scripts/verify_*.py, and update sprint/project report in docs/sprint*/sprint*-report.md
+
+## Evidence
+
+- Workflow: benchmark-or-evaluate-retrieval-results
+- Example files: evaluation/results/*, docs/sprint3/sprint3-report.md
+
+---
+id: vdt-meeting-search-instinct-feature-docs
+trigger: "When planning, documenting, or tracking a new feature, experiment, or sprint"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Feature Docs
+
+## Action
+
+Create or update plan/spec files in docs/superpowers/plans/* or docs/decisions/*, update or create epic/story tracking in docs/stories/epics/*, and update sprint/experiment report in docs/sprint*/sprint*-report.md
+
+## Evidence
+
+- Workflow: feature-or-experiment-documentation-and-planning
+- Example files: docs/superpowers/plans/*, docs/sprint3/sprint3-report.md
+
+---
+id: vdt-meeting-search-instinct-add-tests
+trigger: "When adding a new retrieval pipeline or feature"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: edward1503/vdt-meeting-search
+---
+
+# Vdt Meeting Search Instinct Add Tests
+
+## Action
+
+Implement or update test files in tests/test_*.py corresponding to new or changed code and run tests to ensure correctness
+
+## Evidence
+
+- Workflow: add-or-update-tests-for-new-pipeline-or-feature
+- Example files: tests/test_elasticsearch_retriever.py, tests/test_benchmark_es.py
+
