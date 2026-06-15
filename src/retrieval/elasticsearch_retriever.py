@@ -219,16 +219,17 @@ class ElasticsearchRetriever:
         hits = []
         for hit in response.get("hits", {}).get("hits", []):
             src = hit.get("_source", {})
-            hits.append(
-                {
-                    "doc_id": src.get("doc_id", hit.get("_id", "")),
-                    "title": src.get("title", ""),
-                    "text": src.get("text", ""),
-                    "url": src.get("url", ""),
-                    "score": float(hit.get("_score", 0.0)),
-                    "source": source,
-                }
-            )
+            result = {
+                "doc_id": src.get("doc_id", hit.get("_id", "")),
+                "title": src.get("title", ""),
+                "text": src.get("text", ""),
+                "url": src.get("url", ""),
+                "score": float(hit.get("_score", 0.0)),
+                "source": source,
+            }
+            if "numeric_id" in src and src["numeric_id"] is not None:
+                result["numeric_id"] = int(src["numeric_id"])
+            hits.append(result)
         return hits
 
     def _model(self) -> Any:

@@ -76,12 +76,31 @@ class TurboVecHybridRetriever:
         if method == "tv_hybrid":
             return self._search_hybrid(query, top_k, bm25_k=bm25_k, dense_k=dense_k, rrf_k=rrf_k)
         if method == "tv_filtered_hybrid":
-            return self._search_hybrid(query, top_k, bm25_k=bm25_k, dense_k=dense_k, rrf_k=rrf_k)
+            return self._search_filtered_hybrid(query, top_k, bm25_k=bm25_k, dense_k=dense_k, rrf_k=rrf_k)
         raise ValueError(f"Unknown TurboVec method: {method}")
 
     def _embed_query(self, query: str) -> np.ndarray:
         vector = self.embedder.encode([query], normalize_embeddings=True, convert_to_numpy=True)
         return np.asarray(vector, dtype=np.float32)
+
+    def _build_allowlist(self, hits: list[dict[str, Any]]) -> np.ndarray | None:
+        ids: list[int] = []
+        seen: set[int] = set()
+        for hit in hits:
+            raw_numeric_id = hit.get("numeric_id")
+            if raw_numeric_id is None:
+                continue
+            try:
+                numeric_id = int(raw_numeric_id)
+            except (TypeError, ValueError):
+                continue
+            if numeric_id in seen:
+                continue
+            seen.add(numeric_id)
+            ids.append(numeric_id)
+        if not ids:
+            return None
+        return np.asarray(ids, dtype=np.uint64)
 
     def _search_dense(self, query: str, top_k: int, allowlist: Any | None = None) -> list[dict[str, Any]]:
         timing: dict[str, float] = {}
@@ -111,6 +130,25 @@ class TurboVecHybridRetriever:
         bm25_ms = (time.perf_counter() - start) * 1000
         dense_hits = self._search_dense(query, dense_k)
         timing = {**self.last_timing_ms, "bm25": bm25_ms}
+        start = time.perf_counter()
+        fused = fuse_rrf([bm25_hits, dense_hits], top_k=top_k, rrf_k=rrf_k)
+        timing["fusion"] = (time.perf_counter() - start) * 1000
+        self.last_timing_ms = timing
+        return fused
+
+    def _search_filtered_hybrid(self, query: str, top_k: int, bm25_k: int, dense_k: int, rrf_k: int) -> list[dict[str, Any]]:
+        start = time.perf_counter()
+        bm25_hits = self.bm25_retriever.search(query, "bm25", bm25_k)
+        bm25_ms = (time.perf_counter() - start) * 1000
+
+        start = time.perf_counter()
+        allowlist = self._build_allowlist(bm25_hits)
+        allowlist_ms = (time.perf_counter() - start) * 1000
+
+        dense_search_k = min(dense_k, len(allowlist)) if allowlist is not None else dense_k
+        dense_hits = self._search_dense(query, dense_search_k, allowlist=allowlist)
+        timing = {**self.last_timing_ms, "bm25": bm25_ms, "allowlist": allowlist_ms}
+
         start = time.perf_counter()
         fused = fuse_rrf([bm25_hits, dense_hits], top_k=top_k, rrf_k=rrf_k)
         timing["fusion"] = (time.perf_counter() - start) * 1000

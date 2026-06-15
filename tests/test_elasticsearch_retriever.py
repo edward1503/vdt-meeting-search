@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from src.retrieval.elasticsearch_retriever import build_bm25_index_body, bm25_bulk_action, build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
+from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever, build_bm25_index_body, bm25_bulk_action, build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
 
 
 
@@ -33,6 +33,44 @@ def test_bm25_bulk_action_uses_numeric_id_and_excludes_embedding_text():
     assert action["numeric_id"] == 7
     assert "embedding" not in action
     assert "embedding_text" not in action
+
+def test_bm25_search_preserves_numeric_id_from_source():
+    class FakeES:
+        def search(self, index, body):
+            assert index == "idx"
+            return {
+                "hits": {
+                    "hits": [
+                        {
+                            "_id": "d7",
+                            "_score": 2.5,
+                            "_source": {
+                                "numeric_id": 7,
+                                "doc_id": "d7",
+                                "title": "Title",
+                                "text": "Body",
+                                "url": "",
+                            },
+                        }
+                    ]
+                }
+            }
+
+    retriever = ElasticsearchRetriever(es=FakeES(), index="idx", model_name="model")
+
+    hits = retriever.search("query", "bm25", top_k=1)
+
+    assert hits == [
+        {
+            "numeric_id": 7,
+            "doc_id": "d7",
+            "title": "Title",
+            "text": "Body",
+            "url": "",
+            "score": 2.5,
+            "source": "bm25",
+        }
+    ]
 
 def test_build_index_body_has_text_and_vector_fields():
     body = build_index_body(dims=384)

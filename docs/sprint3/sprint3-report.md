@@ -149,14 +149,14 @@ python -m pytest tests/test_api_es_config.py tests/test_api_cache.py tests/test_
 ## 11. Limitations
 
 - Benchmarks ran on one Windows laptop with approximately 16 GB RAM; latency should be remeasured on target deployment hardware before production claims.
-- The measured `tv_filtered_hybrid` path remains functionally equivalent to broad hybrid search; allowlist-optimized dense search is still a follow-up.
+- `tv_filtered_hybrid` now uses BM25 `numeric_id` candidates as a TurboVec allowlist before RRF fusion. It still needs a fresh full benchmark before it can replace broad `tv_hybrid` as the recommended default.
 - Query embedding is local and synchronous in the benchmark/API path, which dominates part of dense and hybrid latency.
 - BM25 is still the best low-latency fallback when quality requirements are relaxed.
 - Harness tool registry queries fail in this workspace because the installed durable schema lacks the newer `tool` table; backlog item `Repair Harness tool registry schema install` tracks that process issue.
 
 ## 12. Next Steps
 
-1. Add an optimized `tv_filtered_hybrid` allowlist path and benchmark it against broad `tv_hybrid`.
+1. Benchmark the implemented `tv_filtered_hybrid` allowlist path against broad `tv_hybrid` on the same 200-query and full-dev settings.
 2. Cache query embeddings for repeated benchmark/API queries.
 3. Consider lowering API `HYBRID_BM25_K` and `HYBRID_DENSE_K` to 50 for laptop demos, while keeping 100 for quality-first evaluation.
 4. Re-run the benchmark on target deployment hardware and record a platform-specific latency table.
