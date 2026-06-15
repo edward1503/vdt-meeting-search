@@ -234,7 +234,7 @@ def stats() -> dict[str, Any]:
     return {
         "backend": "elasticsearch",
         "index": settings.elasticsearch_index,
-        "methods": sorted(ES_METHODS),
+        "methods": sorted(METHODS),
         "dataset_id": settings.dataset_id,
         "embedding_model": settings.embedding_model,
         "embedding_service_url": settings.embedding_service_url,
@@ -297,7 +297,20 @@ def search(request: SearchRequest) -> dict[str, Any]:
         return cached
 
     start = time.perf_counter()
-    hits = get_es_retriever().search(request.query, ES_METHOD_MAP[method], request.top_k)
+    latency_breakdown_ms: dict[str, float] | None = None
+    if method in TV_METHODS:
+        tv_retriever = get_tv_retriever()
+        hits = tv_retriever.search(
+            request.query,
+            method,
+            request.top_k,
+            bm25_k=settings.hybrid_bm25_k,
+            dense_k=settings.hybrid_dense_k,
+            rrf_k=settings.rrf_k,
+        )
+        latency_breakdown_ms = {key: round(float(value), 4) for key, value in tv_retriever.last_timing_ms.items()}
+    else:
+        hits = get_es_retriever().search(request.query, ES_METHOD_MAP[method], request.top_k)
     latency_ms = round((time.perf_counter() - start) * 1000, 4)
     response = {
         "query": request.query,
@@ -319,6 +332,8 @@ def search(request: SearchRequest) -> dict[str, Any]:
             for rank, hit in enumerate(hits, start=1)
         ],
     }
+    if latency_breakdown_ms is not None:
+        response["latency_breakdown_ms"] = latency_breakdown_ms
     write_search_cache(cache_key, response)
     response["history_id"] = get_history_store().record_search(
         query=response["query"],

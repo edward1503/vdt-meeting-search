@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Source Plan
 
@@ -36,3 +36,13 @@ Build and evaluate full-scale HotpotQA retrieval over 5,233,329 documents using 
 ## Evidence Policy
 
 Unit and integration tests prove code behavior. Full-corpus staging, embedding, indexing, and benchmarks are platform evidence and must be recorded with concrete artifact paths and command output in the story evidence sections.
+
+## Completion Evidence
+
+- Full staging manifest: `artifacts/hotpotqa_full/staging/manifest.json`, `docs_written=5,233,329`, `files_written=105`, `numeric_id_end=5,233,328`.
+- Full BM25 index: `hotpotqa_full_bm25_v1`, validated count `5,233,329`.
+- Full embedding shards: 105 `.float16.npy`, 105 `.ids.npy`, and 105 `.meta.json` files under `artifacts/hotpotqa_full/embeddings/`.
+- Full TurboVec index: `artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`, `docs=5,233,329`, `dim=384`, `bit_width=4`.
+- Primary benchmark: `evaluation/results/hotpotqa_full/tv_full_200.json` on `beir/hotpotqa/dev`, 200 queries.
+- Tuning runs: `evaluation/results/hotpotqa_full/tune_k50_rrf30.json`, `evaluation/results/hotpotqa_full/tune_k200_rrf30.json`, and `evaluation/results/hotpotqa_full/tune_k100_rrf60.json`.
+- Final report: `docs/sprint3/sprint3-report.md`.
