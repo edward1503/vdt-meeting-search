@@ -68,14 +68,29 @@ class TurboVecHybridRetriever:
         self.last_timing_ms: dict[str, float] = {}
 
     @classmethod
-    def from_paths(cls, bm25_retriever: Any, es: Any, index: str, tv_index_path: str, model_name: str) -> "TurboVecHybridRetriever":
-        from sentence_transformers import SentenceTransformer
+    def from_paths(
+        cls,
+        bm25_retriever: Any,
+        es: Any,
+        index: str,
+        tv_index_path: str,
+        model_name: str,
+        embedding_service_url: str = "",
+        embedding_timeout_seconds: int = 30,
+    ) -> "TurboVecHybridRetriever":
         from turbovec import IdMapIndex
+
+        if embedding_service_url:
+            embedder = RemoteEmbeddingClient(embedding_service_url, timeout_seconds=embedding_timeout_seconds)
+        else:
+            from sentence_transformers import SentenceTransformer
+
+            embedder = SentenceTransformer(model_name)
 
         return cls(
             bm25_retriever=bm25_retriever,
             tv_index=IdMapIndex.load(tv_index_path),
-            embedder=SentenceTransformer(model_name),
+            embedder=embedder,
             docstore=ElasticsearchNumericDocStore(es, index),
         )
 
