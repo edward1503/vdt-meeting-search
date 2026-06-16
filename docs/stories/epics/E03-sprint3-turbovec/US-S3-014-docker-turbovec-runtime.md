@@ -14,6 +14,8 @@ The existing Docker system should run the TurboVec dense retrieval methods (`tv_
 
 The frontend must reflect the runtime that actually exists. The search method selector should expose TurboVec methods, the default selection should match the backend default, and the status page should stop hard-coding a 5,090-document corpus when the backend is running a full 5.23M document profile.
 
+For the demo profile, Docker should default to the full runtime: `hotpotqa_full_bm25_current` for Elasticsearch BM25 and `/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim` for TurboVec. Nano remains available only through explicit environment overrides.
+
 ## Relevant Product Docs
 
 - `README.md`
@@ -24,20 +26,20 @@ The frontend must reflect the runtime that actually exists. The search method se
 
 - `requirements-api.txt` installs the minimum dependencies needed for TurboVec search in the API container: `numpy` and `turbovec`.
 - `TurboVecHybridRetriever.from_paths()` uses `EMBEDDING_SERVICE_URL` when configured and does not import `sentence_transformers` in that path.
-- Docker Compose exposes `TURBOVEC_INDEX_PATH` to the API container and continues mounting `./artifacts:/app/artifacts`.
-- A full demo can run with `ELASTICSEARCH_INDEX=hotpotqa_full_bm25_current` and `TURBOVEC_INDEX_PATH=/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`.
+- Docker Compose defaults the API container to `ELASTICSEARCH_INDEX=hotpotqa_full_bm25_current` and `TURBOVEC_INDEX_PATH=/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`, while preserving env override support for nano/100k profiles.
+- A full demo runs without manually selecting nano-era defaults.
 - `/stats` shows enough runtime information to confirm the active Elasticsearch index, TurboVec artifact path, and embedding service URL.
-- The Docker frontend can select and run `tv_hybrid` through the existing `/api/search` proxy.
-- The status view displays backend-provided corpus/runtime details instead of hard-coded nano corpus numbers when those fields are available.
+- The Docker frontend reads `/stats`, defaults the search selector to the backend `default_search_method`, shows only methods reported by the backend when available, and can run `tv_hybrid` through the existing `/api/search` proxy.
+- The status view displays backend-provided corpus/runtime details and TurboVec dataflow instead of hard-coded nano corpus or ES-dense language.
 
 ## Design Notes
 
-- Commands: no new user command is required; existing Docker Compose commands keep working with env overrides.
+- Commands: no new user command is required for the full demo path; existing Docker Compose commands keep working, and env overrides can still select smaller profiles.
 - Queries: `tv_dense`, `tv_hybrid`, and `tv_filtered_hybrid` are the migration target; `es_dense` remains legacy and optional.
 - API: no search request or response shape change is required.
 - Tables: no SQLite or Elasticsearch schema migration.
 - Domain rules: do not mix ES nano with TurboVec full for serious demos; use matching runtime profiles.
-- UI surfaces: the search method selector and status page must align with `/stats` and the Docker runtime.
+- UI surfaces: the search method selector, default method, status parameters, corpus count, and pipeline dataflow must align with `/stats` and the Docker runtime.
 
 ## Validation
 

@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the existing Docker system run TurboVec dense search from the current dashboard by loading the mounted `.tvim` artifact in the API container and reflecting that runtime in the frontend.
+**Goal:** Make the existing Docker system default to the full 5.23M HotpotQA BM25 index plus TurboVec dense search from the current dashboard.
 
-**Architecture:** Do not create a TurboVec service. The API container installs `turbovec` and `numpy`, loads `/app/artifacts/.../*.tvim`, calls Elasticsearch for BM25 and hydration, and calls `EMBEDDING_SERVICE_URL` for query embeddings. The frontend keeps the same `/api/search` contract but updates its visible methods and status display to match `/stats`.
+**Architecture:** Do not create a TurboVec service. The API container installs `turbovec` and `numpy`, loads `/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`, calls Elasticsearch alias `hotpotqa_full_bm25_current` for BM25 and hydration, and calls `EMBEDDING_SERVICE_URL` for query embeddings. The frontend keeps the same `/api/search` contract, reads `/stats`, defaults to the backend `default_search_method`, and displays full-corpus TurboVec runtime state.
 
 **Tech Stack:** Python 3.12, FastAPI, Docker Compose, TurboVec, NumPy, Elasticsearch, existing local embedding server.
 
@@ -15,10 +15,10 @@
 - Modify `requirements-api.txt`: add only `numpy` and `turbovec==0.8.0`.
 - Modify `src/retrieval/turbovec_retriever.py`: add a remote embedding client and make `from_paths()` use it when `embedding_service_url` is configured.
 - Modify `src/api/main.py`: pass `settings.embedding_service_url` and `settings.embedding_timeout_seconds` into `TurboVecHybridRetriever.from_paths()`; include TurboVec path in `/stats`.
-- Modify `docker-compose.yml`: expose `TURBOVEC_INDEX_PATH` to the API container with the existing full artifact path as the default.
+- Modify `docker-compose.yml`: default the API container to `hotpotqa_full_bm25_current`, `tv_hybrid`, and the full TurboVec artifact path while keeping env override support.
 - Modify `frontend/src/lib/api.ts`: type the new `/stats` fields and label TurboVec benchmark/search methods.
-- Modify `frontend/src/components/SearchView.tsx`: include visible TurboVec methods and default to `tv_hybrid`.
-- Modify `frontend/src/components/StatusView.tsx`: display runtime corpus/profile values from `/stats` instead of hard-coded nano values when available.
+- Modify `frontend/src/components/SearchView.tsx`: read `/stats`, derive visible methods from backend methods when available, and default to backend `default_search_method`.
+- Modify `frontend/src/components/StatusView.tsx`: display runtime corpus/profile values from `/stats`, show TurboVec artifact details, and update the pipeline dataflow away from ES-dense language.
 - Modify `tests/test_turbovec_retriever.py`: prove remote embedding client shape and `from_paths()` selection.
 - Modify `tests/test_api_es_config.py`: prove `/stats` exposes TurboVec runtime fields and API factory forwards embedding service settings.
 - Update `docs/stories/epics/E03-sprint3-turbovec/US-S3-014-docker-turbovec-runtime.md`: record evidence after validation.
@@ -366,29 +366,81 @@ In `frontend/src/lib/api.ts`, extend `methodLabel()`:
       return 'BM25-filtered TurboVec RRF';
 ```
 
-- [ ] **Step 3: Expose TurboVec methods in the search dropdown**
+- [ ] **Step 3: Make SearchView follow backend methods and default**
 
-In `frontend/src/components/SearchView.tsx`, replace `METHODS` with:
+In `frontend/src/components/SearchView.tsx`, update the API import:
 
 ```ts
-const METHODS = [
-  { value: 'tv_hybrid', label: 'TurboVec Hybrid RRF (Full Dense + BM25)' },
-  { value: 'tv_dense', label: 'TurboVec Dense (Vector Only)' },
-  { value: 'tv_filtered_hybrid', label: 'Filtered TurboVec Hybrid' },
-  { value: 'es_bm25', label: 'Standard BM25 (Keyword Only)' },
-  { value: 'es_hybrid', label: 'Elasticsearch Hybrid RRF (Legacy)' },
-  { value: 'es_dense', label: 'Elasticsearch Dense (Legacy)' },
-  { value: 'es_iterative_hybrid', label: 'Iterative Expansion (Multi-hop)' },
-];
+import { getStats, searchHotpotQA, type SearchResult, type SearchResponse } from '@/src/lib/api';
 ```
 
-Change the initial method state:
+Replace `METHODS` with `METHOD_LABELS` and helper functions:
 
 ```ts
+const METHOD_LABELS: Record<string, string> = {
+  tv_hybrid: 'TurboVec Hybrid RRF (Full Dense + BM25)',
+  tv_dense: 'TurboVec Dense (Vector Only)',
+  tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
+  es_bm25: 'Standard BM25 (Keyword Only)',
+  es_hybrid: 'Elasticsearch Hybrid RRF (Legacy)',
+  es_dense: 'Elasticsearch Dense (Legacy)',
+  es_iterative_hybrid: 'Iterative Expansion (Multi-hop)',
+};
+
+const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25', 'es_hybrid', 'es_dense', 'es_iterative_hybrid'];
+
+function methodOptions(methods?: string[]) {
+  return (methods && methods.length ? methods : FALLBACK_METHODS).map((value) => ({
+    value,
+    label: METHOD_LABELS[value] ?? value,
+  }));
+}
+```
+
+Add stats-backed method state inside `SearchView`:
+
+```ts
+  const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
   const [method, setMethod] = useState('tv_hybrid');
 ```
 
-- [ ] **Step 4: Display runtime corpus and TurboVec path in StatusView**
+Add this effect before the existing preset effect:
+
+```ts
+  useEffect(() => {
+    getStats()
+      .then((stats) => {
+        const methods = stats.methods?.length ? stats.methods : FALLBACK_METHODS;
+        setAvailableMethods(methods);
+        setMethod(methods.includes(stats.default_search_method ?? '') ? stats.default_search_method! : methods[0] ?? 'tv_hybrid');
+      })
+      .catch(() => {
+        setAvailableMethods(FALLBACK_METHODS);
+        setMethod('tv_hybrid');
+      });
+  }, []);
+```
+
+Update the preset effect so invalid historical presets cannot switch the UI away from backend-supported methods:
+
+```ts
+  useEffect(() => {
+    if (!preset) return;
+    setQuery(preset.query);
+    setMethod(availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid');
+    setTopK(preset.topK);
+    setResponse(null);
+    setError(null);
+  }, [availableMethods, preset]);
+```
+
+Update the dropdown render:
+
+```tsx
+              {methodOptions(availableMethods).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+```
+
+- [ ] **Step 4: Display full runtime corpus, TurboVec path, and TurboVec dataflow in StatusView**
 
 In `frontend/src/components/StatusView.tsx`, add helper functions above `StatusView()`:
 
@@ -425,6 +477,20 @@ Add TurboVec path to the final details grid by replacing that grid with:
           </div>
 ```
 
+Update the dataflow nodes so the status page no longer implies Elasticsearch dense vector retrieval. Replace the node sequence inside the dataflow row with:
+
+```tsx
+            <FlowNode Icon={Dataset} label="HotpotQA" sub={runtimeProfileLabel(stats?.runtime_profile)} />
+            <FlowConnector />
+            <FlowNode Icon={DescriptionIcon} label="ES BM25" sub="5.23M DOCS" isPrimary />
+            <FlowConnector />
+            <FlowNode Icon={Hub} label="BGE Embed" sub="HOST:8010" isAlt />
+            <FlowConnector />
+            <FlowNode Icon={Memory} label="TurboVec" sub="LOCAL .TVIM" isPrimary />
+            <FlowConnector />
+            <FlowNode Icon={Lan} label="RRF Evidence" sub="RANKED" />
+```
+
 - [ ] **Step 5: Run frontend typecheck**
 
 Run:
@@ -443,7 +509,7 @@ git add frontend/src/lib/api.ts frontend/src/components/SearchView.tsx frontend/
 git commit -m "feat: sync frontend with turbovec runtime"
 ```
 
-## Task 5: Minimal Docker Dependency And Env Wiring
+## Task 5: Minimal Docker Dependency And Full Runtime Env Wiring
 
 **Files:**
 - Modify: `requirements-api.txt`
@@ -460,12 +526,22 @@ turbovec==0.8.0
 
 Do not add `sentence-transformers` to `requirements-api.txt` in this migration. The API container should use `EMBEDDING_SERVICE_URL` for embeddings.
 
-- [ ] **Step 2: Add Docker env for TurboVec path**
+- [ ] **Step 2: Default Docker API to full BM25 + TurboVec**
 
-In `docker-compose.yml`, add this line under `api.environment`:
+In `docker-compose.yml`, replace the API index default:
+
+```yaml
+      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-hotpotqa_full_bm25_current}
+```
+
+Add these lines under `api.environment`:
 
 ```yaml
       - TURBOVEC_INDEX_PATH=${TURBOVEC_INDEX_PATH:-/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim}
+      - DEFAULT_SEARCH_METHOD=${DEFAULT_SEARCH_METHOD:-tv_hybrid}
+      - HYBRID_BM25_K=${HYBRID_BM25_K:-50}
+      - HYBRID_DENSE_K=${HYBRID_DENSE_K:-50}
+      - RRF_K=${RRF_K:-30}
 ```
 
 Keep this existing mount unchanged:
@@ -508,21 +584,15 @@ python scripts/embedding_server.py --host 0.0.0.0 --port 8010
 
 Expected: service listens at `http://localhost:8010/embed`.
 
-- [ ] **Step 2: Start Docker with full runtime overrides**
+- [ ] **Step 2: Start Docker with full runtime defaults**
 
 Run in a second PowerShell:
 
 ```powershell
-$env:ELASTICSEARCH_INDEX="hotpotqa_full_bm25_current"
-$env:TURBOVEC_INDEX_PATH="/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim"
-$env:DEFAULT_SEARCH_METHOD="tv_hybrid"
-$env:HYBRID_BM25_K="50"
-$env:HYBRID_DENSE_K="50"
-$env:RRF_K="30"
 docker compose up -d elasticsearch redis api frontend
 ```
 
-Expected: `api` and `frontend` containers become healthy/running.
+Expected: `api` and `frontend` containers become healthy/running, and the API uses full defaults without extra environment overrides.
 
 - [ ] **Step 3: Verify `/stats` through Docker API**
 
@@ -538,6 +608,8 @@ Expected payload contains:
 {
   "index": "hotpotqa_full_bm25_current",
   "default_search_method": "tv_hybrid",
+  "runtime_profile": "full",
+  "corpus_doc_count": 5233329,
   "turbovec_index_path": "/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim",
   "embedding_service_url": "http://host.docker.internal:8010/embed"
 }
@@ -565,7 +637,7 @@ Open `http://localhost:3001`, select or run `tv_hybrid`, and issue:
 What occupations do both Ian Hunter and Rob Thomas have?
 ```
 
-Expected: dashboard displays `tv_hybrid` as a visible dropdown option, shows ranked results and latency, and the Status page displays the full runtime profile, full corpus doc count, and TurboVec index path.
+Expected: dashboard defaults to `tv_hybrid`, displays `tv_hybrid`/`tv_dense`/`tv_filtered_hybrid` as visible options from backend stats, shows ranked results and latency, and the Status page displays `FULL`, `5,233,329 docs`, the full TurboVec index path, and a TurboVec dataflow.
 
 - [ ] **Step 6: Record Harness proof**
 
