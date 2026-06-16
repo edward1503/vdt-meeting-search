@@ -142,6 +142,8 @@ def get_tv_retriever() -> TurboVecHybridRetriever:
         index=settings.elasticsearch_index,
         tv_index_path=str(settings.turbovec_index_path),
         model_name=settings.embedding_model,
+        embedding_service_url=settings.embedding_service_url,
+        embedding_timeout_seconds=settings.embedding_timeout_seconds,
     )
 
 def load_query_examples(path: Path = QUERY_EXAMPLES_PATH) -> list[dict[str, Any]]:
@@ -229,6 +231,33 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def infer_runtime_profile(index: str, turbovec_index_path: Path) -> str:
+    index_text = index.lower()
+    path_text = str(turbovec_index_path).lower()
+    if "full" in index_text or "hotpotqa_full" in path_text:
+        return "full"
+    if "100k" in index_text or "100k" in path_text:
+        return "100k"
+    if "nano" in index_text or "nano" in path_text:
+        return "nano"
+    if "smoke" in index_text or "smoke" in path_text:
+        return "smoke"
+    return "custom"
+
+
+def infer_corpus_doc_count(index: str) -> int | None:
+    index_text = index.lower()
+    if "full" in index_text:
+        return 5233329
+    if "100k" in index_text:
+        return 100000
+    if "nano" in index_text:
+        return 5090
+    if "smoke" in index_text:
+        return 1000
+    return None
+
+
 @app.get("/stats")
 def stats() -> dict[str, Any]:
     return {
@@ -236,11 +265,17 @@ def stats() -> dict[str, Any]:
         "index": settings.elasticsearch_index,
         "methods": sorted(METHODS),
         "dataset_id": settings.dataset_id,
+        "default_search_method": settings.default_search_method,
         "embedding_model": settings.embedding_model,
         "embedding_service_url": settings.embedding_service_url,
         "num_candidates": settings.elasticsearch_num_candidates,
         "search_cache_ttl_seconds": settings.search_cache_ttl_seconds,
         "history_db_path": str(settings.history_db_path),
+        "turbovec_index_path": str(settings.turbovec_index_path),
+        "turbovec_dim": settings.turbovec_dim,
+        "turbovec_bit_width": settings.turbovec_bit_width,
+        "runtime_profile": infer_runtime_profile(settings.elasticsearch_index, settings.turbovec_index_path),
+        "corpus_doc_count": infer_corpus_doc_count(settings.elasticsearch_index),
     }
 
 

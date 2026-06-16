@@ -120,3 +120,36 @@ def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     assert response["history_id"] == 123
     assert response["latency_breakdown_ms"] == {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
     assert response["results"][0]["source"] == "bm25+dense"
+
+def test_stats_exposes_turbovec_runtime_path():
+    from src.api import main
+
+    payload = main.stats()
+
+    assert "turbovec_index_path" in payload
+    assert "default_search_method" in payload
+    assert "corpus_doc_count" in payload
+    assert "runtime_profile" in payload
+
+def test_get_tv_retriever_passes_embedding_service_settings(monkeypatch):
+    from src.api import main
+
+    captured = {}
+
+    class FakeElasticsearch:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeTV:
+        @classmethod
+        def from_paths(cls, **kwargs):
+            captured.update(kwargs)
+            return "tv"
+
+    main.get_tv_retriever.cache_clear()
+    monkeypatch.setattr("elasticsearch.Elasticsearch", FakeElasticsearch)
+    monkeypatch.setattr(main, "TurboVecHybridRetriever", FakeTV)
+
+    assert main.get_tv_retriever() == "tv"
+    assert captured["embedding_service_url"] == main.settings.embedding_service_url
+    assert captured["embedding_timeout_seconds"] == main.settings.embedding_timeout_seconds
