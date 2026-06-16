@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react';
 import { CloudDone, Database, Storage, Memory, Hub, DescriptionIcon, Dataset, Lan, Info } from '@/src/components/Icons';
 import { getHealth, getStats, type StatsResponse } from '@/src/lib/api';
 
+function formatDocCount(count?: number | null) {
+  if (!count) return 'unknown';
+  return count.toLocaleString('en-US');
+}
+
+function runtimeProfileLabel(profile?: string) {
+  return profile ? profile.toUpperCase() : 'UNKNOWN';
+}
+
 export function StatusView() {
   const [health, setHealth] = useState('checking');
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -47,16 +56,17 @@ export function StatusView() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-outline-variant">
             <SpecItem label="Dataset" value={stats?.dataset_id ?? 'nano-beir/hotpotqa'} />
             <SpecItem label="Embedding Model" value={stats?.embedding_model ?? 'BAAI/bge-small-en-v1.5'} />
-            <SpecItem label="Embedding Service" value={stats?.embedding_service_url ?? 'local fallback'} />
+            <SpecItem label="Runtime Profile" value={runtimeProfileLabel(stats?.runtime_profile)} />
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 border-t border-outline-variant divide-x divide-outline-variant">
             <SpecItem label="Candidate Pool" value={String(stats?.num_candidates ?? 'unknown')} />
             <SpecItem label="Cache TTL" value={`${stats?.search_cache_ttl_seconds ?? 300}s`} />
-            <StatItem label="Corpus" value="5,090" unit="docs" />
+            <StatItem label="Corpus" value={formatDocCount(stats?.corpus_doc_count)} unit="docs" />
             <StatItem label="Benchmarks" value="50" unit="cases" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 border-t border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant">
+          <div className="grid grid-cols-1 md:grid-cols-3 border-t border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant">
             <SpecItem label="Available Methods" value={stats?.methods?.join(', ') ?? 'loading'} />
+            <SpecItem label="TurboVec Index" value={stats?.turbovec_index_path ?? 'not configured'} />
             <SpecItem label="History DB" value={stats?.history_db_path ?? '/app/data/query_history.sqlite3'} />
           </div>
         </section>
@@ -72,17 +82,15 @@ export function StatusView() {
         </div>
         <div className="bg-white border border-outline-variant rounded-xl p-5 overflow-x-auto custom-scrollbar">
           <div className="flex items-center min-w-max justify-center gap-5">
-            <FlowNode Icon={Dataset} label="HotpotQA" sub="DATASET" />
+            <FlowNode Icon={Dataset} label="HotpotQA" sub={runtimeProfileLabel(stats?.runtime_profile)} />
             <FlowConnector />
-            <FlowNode Icon={DescriptionIcon} label="Staging" sub="JSONL" />
+            <FlowNode Icon={DescriptionIcon} label="ES BM25" sub="5.23M DOCS" isPrimary />
             <FlowConnector />
-            <FlowNode Icon={Hub} label="Local BGE" sub="HOST:8010" isAlt />
+            <FlowNode Icon={Hub} label="BGE Embed" sub="HOST:8010" isAlt />
             <FlowConnector />
-            <FlowNode Icon={Hub} label="ES Index" sub="SEARCH" isPrimary />
+            <FlowNode Icon={Memory} label="TurboVec" sub="LOCAL .TVIM" isPrimary />
             <FlowConnector />
-            <FlowNode Icon={Memory} label="Retrieval" sub="BM25/DENSE" />
-            <FlowConnector />
-            <FlowNode Icon={Lan} label="Evidence" sub="RANKED" />
+            <FlowNode Icon={Lan} label="RRF Evidence" sub="RANKED" />
           </div>
         </div>
       </section>

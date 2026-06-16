@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { searchHotpotQA, type SearchResult, type SearchResponse } from '@/src/lib/api';
+import { getStats, searchHotpotQA, type SearchResult, type SearchResponse } from '@/src/lib/api';
 import type { SearchPreset } from '@/src/types';
 
 const SUGGESTIONS = [
@@ -9,29 +9,55 @@ const SUGGESTIONS = [
   'The Death of Cook depicts the death of James Cook at a bay on what coast?',
 ];
 
-const METHODS = [
-  { value: 'es_hybrid', label: 'Hybrid RRF (Vector + Keyword)' },
-  { value: 'es_bm25', label: 'Standard BM25 (Keyword Only)' },
-  { value: 'es_dense', label: 'Dense BGE (Vector Only)' },
-  { value: 'es_iterative_hybrid', label: 'Iterative Expansion (Multi-hop)' },
-];
+const METHOD_LABELS: Record<string, string> = {
+  tv_hybrid: 'TurboVec Hybrid RRF (Full Dense + BM25)',
+  tv_dense: 'TurboVec Dense (Vector Only)',
+  tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
+  es_bm25: 'Standard BM25 (Keyword Only)',
+  es_hybrid: 'Elasticsearch Hybrid RRF (Legacy)',
+  es_dense: 'Elasticsearch Dense (Legacy)',
+  es_iterative_hybrid: 'Iterative Expansion (Multi-hop)',
+};
+
+const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25', 'es_hybrid', 'es_dense', 'es_iterative_hybrid'];
+
+function methodOptions(methods?: string[]) {
+  return (methods && methods.length ? methods : FALLBACK_METHODS).map((value) => ({
+    value,
+    label: METHOD_LABELS[value] ?? value,
+  }));
+}
 
 export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   const [query, setQuery] = useState(SUGGESTIONS[0]);
-  const [method, setMethod] = useState('es_bm25');
+  const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
+  const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    getStats()
+      .then((stats) => {
+        const methods = stats.methods?.length ? stats.methods : FALLBACK_METHODS;
+        setAvailableMethods(methods);
+        setMethod(methods.includes(stats.default_search_method ?? '') ? stats.default_search_method! : methods[0] ?? 'tv_hybrid');
+      })
+      .catch(() => {
+        setAvailableMethods(FALLBACK_METHODS);
+        setMethod('tv_hybrid');
+      });
+  }, []);
+
+  useEffect(() => {
     if (!preset) return;
     setQuery(preset.query);
-    setMethod(preset.method);
+    setMethod(availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid');
     setTopK(preset.topK);
     setResponse(null);
     setError(null);
-  }, [preset]);
+  }, [availableMethods, preset]);
 
   async function runSearch(nextQuery = query) {
     const trimmed = nextQuery.trim();
@@ -98,7 +124,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
               onChange={(event) => setMethod(event.target.value)}
               className="w-full bg-white border border-outline-variant rounded-lg px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-primary outline-none appearance-none cursor-pointer font-mono tracking-tight"
             >
-              {METHODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {methodOptions(availableMethods).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <UnfoldMore className="absolute right-3 top-[2.65rem] pointer-events-none text-on-surface-variant" size={16} />
           </ControlItem>

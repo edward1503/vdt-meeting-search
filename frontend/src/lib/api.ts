@@ -51,6 +51,12 @@ export interface StatsResponse {
   num_candidates?: number;
   search_cache_ttl_seconds?: number;
   history_db_path?: string;
+  default_search_method?: string;
+  turbovec_index_path?: string;
+  turbovec_dim?: number;
+  turbovec_bit_width?: number;
+  runtime_profile?: string;
+  corpus_doc_count?: number | null;
 }
 
 interface ApiQuery {
@@ -129,6 +135,12 @@ function methodLabel(method: string): string {
       return 'BM25 + dense RRF';
     case 'es_iterative_hybrid':
       return 'Two-hop hybrid expansion';
+    case 'tv_dense':
+      return 'TurboVec dense retrieval';
+    case 'tv_hybrid':
+      return 'TurboVec + BM25 RRF';
+    case 'tv_filtered_hybrid':
+      return 'BM25-filtered TurboVec RRF';
     default:
       return 'Retrieval method';
   }
