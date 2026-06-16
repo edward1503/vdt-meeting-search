@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the existing API Docker container run TurboVec dense search by loading the mounted `.tvim` artifact directly, while keeping embeddings outside the API image through the existing embedding HTTP service.
+**Goal:** Make the existing Docker system run TurboVec dense search from the current dashboard by loading the mounted `.tvim` artifact in the API container and reflecting that runtime in the frontend.
 
-**Architecture:** Do not create a TurboVec service. The API container installs `turbovec` and `numpy`, loads `/app/artifacts/.../*.tvim`, calls Elasticsearch for BM25 and hydration, and calls `EMBEDDING_SERVICE_URL` for query embeddings. Frontend and API contracts stay unchanged.
+**Architecture:** Do not create a TurboVec service. The API container installs `turbovec` and `numpy`, loads `/app/artifacts/.../*.tvim`, calls Elasticsearch for BM25 and hydration, and calls `EMBEDDING_SERVICE_URL` for query embeddings. The frontend keeps the same `/api/search` contract but updates its visible methods and status display to match `/stats`.
 
 **Tech Stack:** Python 3.12, FastAPI, Docker Compose, TurboVec, NumPy, Elasticsearch, existing local embedding server.
 
@@ -16,6 +16,9 @@
 - Modify `src/retrieval/turbovec_retriever.py`: add a remote embedding client and make `from_paths()` use it when `embedding_service_url` is configured.
 - Modify `src/api/main.py`: pass `settings.embedding_service_url` and `settings.embedding_timeout_seconds` into `TurboVecHybridRetriever.from_paths()`; include TurboVec path in `/stats`.
 - Modify `docker-compose.yml`: expose `TURBOVEC_INDEX_PATH` to the API container with the existing full artifact path as the default.
+- Modify `frontend/src/lib/api.ts`: type the new `/stats` fields and label TurboVec benchmark/search methods.
+- Modify `frontend/src/components/SearchView.tsx`: include visible TurboVec methods and default to `tv_hybrid`.
+- Modify `frontend/src/components/StatusView.tsx`: display runtime corpus/profile values from `/stats` instead of hard-coded nano values when available.
 - Modify `tests/test_turbovec_retriever.py`: prove remote embedding client shape and `from_paths()` selection.
 - Modify `tests/test_api_es_config.py`: prove `/stats` exposes TurboVec runtime fields and API factory forwards embedding service settings.
 - Update `docs/stories/epics/E03-sprint3-turbovec/US-S3-014-docker-turbovec-runtime.md`: record evidence after validation.
@@ -208,7 +211,7 @@ git add src/retrieval/turbovec_retriever.py tests/test_turbovec_retriever.py
 git commit -m "feat: use remote embeddings for docker turbovec"
 ```
 
-## Task 3: Wire API Settings And Stats
+## Task 3: Wire API Settings And Runtime Stats
 
 **Files:**
 - Modify: `src/api/main.py`
@@ -226,6 +229,8 @@ def test_stats_exposes_turbovec_runtime_path():
 
     assert "turbovec_index_path" in payload
     assert "default_search_method" in payload
+    assert "corpus_doc_count" in payload
+    assert "runtime_profile" in payload
 ```
 
 - [ ] **Step 2: Add failing factory wiring test**
@@ -272,6 +277,38 @@ In `src/api/main.py`, add these keys to `stats()` return payload:
         "turbovec_index_path": str(settings.turbovec_index_path),
         "turbovec_dim": settings.turbovec_dim,
         "turbovec_bit_width": settings.turbovec_bit_width,
+        "runtime_profile": infer_runtime_profile(settings.elasticsearch_index, settings.turbovec_index_path),
+        "corpus_doc_count": infer_corpus_doc_count(settings.elasticsearch_index),
+```
+
+Add these helper functions above `stats()`:
+
+```python
+def infer_runtime_profile(index: str, turbovec_index_path: Path) -> str:
+    index_text = index.lower()
+    path_text = str(turbovec_index_path).lower()
+    if "full" in index_text or "hotpotqa_full" in path_text:
+        return "full"
+    if "100k" in index_text or "100k" in path_text:
+        return "100k"
+    if "nano" in index_text or "nano" in path_text:
+        return "nano"
+    if "smoke" in index_text or "smoke" in path_text:
+        return "smoke"
+    return "custom"
+
+
+def infer_corpus_doc_count(index: str) -> int | None:
+    index_text = index.lower()
+    if "full" in index_text:
+        return 5233329
+    if "100k" in index_text:
+        return 100000
+    if "nano" in index_text:
+        return 5090
+    if "smoke" in index_text:
+        return 1000
+    return None
 ```
 
 - [ ] **Step 5: Update `get_tv_retriever()` factory**
@@ -296,7 +333,117 @@ git add src/api/main.py tests/test_api_es_config.py
 git commit -m "feat: expose docker turbovec runtime settings"
 ```
 
-## Task 4: Minimal Docker Dependency And Env Wiring
+## Task 4: Frontend Runtime Synchronization
+
+**Files:**
+- Modify: `frontend/src/lib/api.ts`
+- Modify: `frontend/src/components/SearchView.tsx`
+- Modify: `frontend/src/components/StatusView.tsx`
+
+- [ ] **Step 1: Update StatsResponse with runtime fields**
+
+In `frontend/src/lib/api.ts`, extend `StatsResponse`:
+
+```ts
+  default_search_method?: string;
+  turbovec_index_path?: string;
+  turbovec_dim?: number;
+  turbovec_bit_width?: number;
+  runtime_profile?: string;
+  corpus_doc_count?: number | null;
+```
+
+- [ ] **Step 2: Add labels for TurboVec methods**
+
+In `frontend/src/lib/api.ts`, extend `methodLabel()`:
+
+```ts
+    case 'tv_dense':
+      return 'TurboVec dense retrieval';
+    case 'tv_hybrid':
+      return 'TurboVec + BM25 RRF';
+    case 'tv_filtered_hybrid':
+      return 'BM25-filtered TurboVec RRF';
+```
+
+- [ ] **Step 3: Expose TurboVec methods in the search dropdown**
+
+In `frontend/src/components/SearchView.tsx`, replace `METHODS` with:
+
+```ts
+const METHODS = [
+  { value: 'tv_hybrid', label: 'TurboVec Hybrid RRF (Full Dense + BM25)' },
+  { value: 'tv_dense', label: 'TurboVec Dense (Vector Only)' },
+  { value: 'tv_filtered_hybrid', label: 'Filtered TurboVec Hybrid' },
+  { value: 'es_bm25', label: 'Standard BM25 (Keyword Only)' },
+  { value: 'es_hybrid', label: 'Elasticsearch Hybrid RRF (Legacy)' },
+  { value: 'es_dense', label: 'Elasticsearch Dense (Legacy)' },
+  { value: 'es_iterative_hybrid', label: 'Iterative Expansion (Multi-hop)' },
+];
+```
+
+Change the initial method state:
+
+```ts
+  const [method, setMethod] = useState('tv_hybrid');
+```
+
+- [ ] **Step 4: Display runtime corpus and TurboVec path in StatusView**
+
+In `frontend/src/components/StatusView.tsx`, add helper functions above `StatusView()`:
+
+```ts
+function formatDocCount(count?: number | null) {
+  if (!count) return 'unknown';
+  return count.toLocaleString('en-US');
+}
+
+function runtimeProfileLabel(profile?: string) {
+  return profile ? profile.toUpperCase() : 'UNKNOWN';
+}
+```
+
+Replace the hard-coded corpus stat:
+
+```tsx
+            <StatItem label="Corpus" value={formatDocCount(stats?.corpus_doc_count)} unit="docs" />
+```
+
+Add a runtime profile spec item in the runtime parameters grid by replacing the third item row with:
+
+```tsx
+            <SpecItem label="Runtime Profile" value={runtimeProfileLabel(stats?.runtime_profile)} />
+```
+
+Add TurboVec path to the final details grid by replacing that grid with:
+
+```tsx
+          <div className="grid grid-cols-1 md:grid-cols-3 border-t border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant">
+            <SpecItem label="Available Methods" value={stats?.methods?.join(', ') ?? 'loading'} />
+            <SpecItem label="TurboVec Index" value={stats?.turbovec_index_path ?? 'not configured'} />
+            <SpecItem label="History DB" value={stats?.history_db_path ?? '/app/data/query_history.sqlite3'} />
+          </div>
+```
+
+- [ ] **Step 5: Run frontend typecheck**
+
+Run:
+
+```powershell
+cd frontend
+npm run lint
+```
+
+Expected: PASS.
+
+- [ ] **Step 6: Commit Task 4**
+
+```bash
+git add frontend/src/lib/api.ts frontend/src/components/SearchView.tsx frontend/src/components/StatusView.tsx
+git commit -m "feat: sync frontend with turbovec runtime"
+```
+
+## Task 5: Minimal Docker Dependency And Env Wiring
 
 **Files:**
 - Modify: `requirements-api.txt`
@@ -339,14 +486,14 @@ Run: `docker compose build api`
 
 Expected: build succeeds and installs `turbovec` without installing `sentence-transformers`.
 
-- [ ] **Step 5: Commit Task 4**
+- [ ] **Step 5: Commit Task 5**
 
 ```bash
 git add requirements-api.txt docker-compose.yml
 git commit -m "build: install turbovec in api container"
 ```
 
-## Task 5: Full-Corpus Docker Smoke Demo
+## Task 6: Full-Corpus Docker Smoke Demo
 
 **Files:**
 - Modify: `docs/stories/epics/E03-sprint3-turbovec/US-S3-014-docker-turbovec-runtime.md`
@@ -418,7 +565,7 @@ Open `http://localhost:3001`, select or run `tv_hybrid`, and issue:
 What occupations do both Ian Hunter and Rob Thomas have?
 ```
 
-Expected: dashboard displays ranked results and latency. This proves frontend/backend wiring did not need a contract change.
+Expected: dashboard displays `tv_hybrid` as a visible dropdown option, shows ranked results and latency, and the Status page displays the full runtime profile, full corpus doc count, and TurboVec index path.
 
 - [ ] **Step 6: Record Harness proof**
 
