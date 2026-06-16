@@ -60,4 +60,11 @@ No Harness policy change is planned.
 
 ## Evidence
 
-Planned. Add validation commands and output after implementation.
+- `python -m pytest tests/test_api_es_config.py tests/test_turbovec_retriever.py -q`: 14 passed, 3 warnings.
+- `cd frontend; npm run lint`: passed (`tsc --noEmit`).
+- `docker compose build api --progress plain`: passed; build context reduced to 13.90kB after excluding mounted data artifacts from the image context; `vdt-meeting-search-api:latest` built with `numpy==2.3.5` and `turbovec==0.8.0`.
+- `Invoke-RestMethod http://localhost:9200/hotpotqa_full_bm25_current/_count`: count `5233329`.
+- `Invoke-RestMethod http://localhost:8001/stats`: returned `index=hotpotqa_full_bm25_current`, `default_search_method=tv_hybrid`, `runtime_profile=full`, `corpus_doc_count=5233329`, `turbovec_index_path=/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`, and `embedding_service_url=http://host.docker.internal:8010/embed`.
+- Docker API `POST /search` with `method=tv_dense`, `top_k=5`: returned 5 dense results from TurboVec, including `Ian Hunter (actor)` rank 1; no `sentence_transformers` import error.
+- Docker API `POST /search` with `method=tv_hybrid`, `top_k=5`: returned fused `bm25+dense` results in about 1415ms after TurboVec load, with latency breakdown including `embed`, `turbovec`, `hydrate`, `bm25`, and `fusion`.
+- Playwright CLI against `http://localhost:3001`: Status page displayed `FULL`, `5,233,329 docs`, full TurboVec index path, and TurboVec dataflow; Search page defaulted to `TurboVec Hybrid RRF (Full Dense + BM25)`, exposed `tv_dense`, `tv_filtered_hybrid`, and `tv_hybrid`, and returned 10 ranked frontend results with `Method: bm25+dense`.
