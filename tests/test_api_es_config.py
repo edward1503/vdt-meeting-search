@@ -1,14 +1,19 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from src.core.config import Settings
 from types import SimpleNamespace
 
+import pytest
 
-def test_api_exposes_es_iterative_hybrid_method():
+from src.core.config import Settings
+
+
+def test_api_exposes_only_bm25_es_method():
     from src.api import main
 
-    assert 'es_iterative_hybrid' in main.ES_METHODS
-    assert main.ES_METHOD_MAP['es_iterative_hybrid'] == 'iterative_hybrid'
+    assert main.ES_METHODS == {"es_bm25"}
+    assert main.ES_METHOD_MAP == {"es_bm25": "bm25"}
+    assert "es_bm25" in main.METHODS
+    assert {"es_dense", "es_hybrid", "es_iterative_hybrid"}.isdisjoint(main.METHODS)
 
 
 def test_settings_exposes_elasticsearch_defaults():
@@ -17,6 +22,7 @@ def test_settings_exposes_elasticsearch_defaults():
     assert settings.elasticsearch_url == "http://localhost:9200"
     assert settings.elasticsearch_index == "hotpotqa_docs_current"
     assert settings.embedding_model == "BAAI/bge-small-en-v1.5"
+
 
 def test_load_query_examples_reads_supported_doc_ids(tmp_path):
     from src.api import main
@@ -39,6 +45,7 @@ def test_load_query_examples_reads_supported_doc_ids(tmp_path):
         }
     ]
 
+
 def test_build_query_examples_joins_queries_and_qrels():
     from src.api import main
 
@@ -56,6 +63,7 @@ def test_build_query_examples_joins_queries_and_qrels():
         {"query_id": "q2", "query": "Question two", "support_doc_ids": [], "support_doc_count": 0},
     ]
 
+
 def test_load_benchmark_result_reads_json(tmp_path):
     from src.api import main
 
@@ -72,15 +80,31 @@ def test_api_exposes_turbovec_methods_and_settings():
     from src.api import main
 
     settings = Settings()
+    stats_methods = set(main.stats()["methods"])
 
     assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(main.METHODS)
-    assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(set(main.stats()["methods"]))
+    assert {"es_bm25", "tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(stats_methods)
+    assert {"es_dense", "es_hybrid", "es_iterative_hybrid"}.isdisjoint(stats_methods)
     assert settings.default_search_method == "tv_hybrid"
     assert main.SearchRequest(query="Who connects Alpha and Beta?").method == "tv_hybrid"
     assert settings.turbovec_bit_width == 4
     assert settings.turbovec_dim == 384
     assert settings.hybrid_bm25_k == 100
     assert settings.hybrid_dense_k == 100
+
+
+def test_search_rejects_legacy_es_dense_hybrid_methods():
+    from fastapi import HTTPException
+
+    from src.api import main
+
+    for method in ["es_dense", "es_hybrid", "es_iterative_hybrid"]:
+        with pytest.raises(HTTPException) as exc_info:
+            main.search(main.SearchRequest(query="Who connects Alpha and Beta?", method=method, top_k=1))
+
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.detail == f"Unknown method: {method}"
+
 
 def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     from src.api import main
@@ -121,6 +145,7 @@ def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     assert response["latency_breakdown_ms"] == {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
     assert response["results"][0]["source"] == "bm25+dense"
 
+
 def test_stats_exposes_turbovec_runtime_path():
     from src.api import main
 
@@ -130,6 +155,7 @@ def test_stats_exposes_turbovec_runtime_path():
     assert "default_search_method" in payload
     assert "corpus_doc_count" in payload
     assert "runtime_profile" in payload
+
 
 def test_get_tv_retriever_passes_embedding_service_settings(monkeypatch):
     from src.api import main

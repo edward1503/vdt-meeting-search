@@ -14,12 +14,9 @@ const METHOD_LABELS: Record<string, string> = {
   tv_dense: 'TurboVec Dense (Vector Only)',
   tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
   es_bm25: 'Standard BM25 (Keyword Only)',
-  es_hybrid: 'Elasticsearch Hybrid RRF (Legacy)',
-  es_dense: 'Elasticsearch Dense (Legacy)',
-  es_iterative_hybrid: 'Iterative Expansion (Multi-hop)',
 };
 
-const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25', 'es_hybrid', 'es_dense', 'es_iterative_hybrid'];
+const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25'];
 
 function methodOptions(methods?: string[]) {
   return (methods && methods.length ? methods : FALLBACK_METHODS).map((value) => ({

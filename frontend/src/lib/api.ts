@@ -129,12 +129,6 @@ function methodLabel(method: string): string {
   switch (method) {
     case 'es_bm25':
       return 'Keyword baseline';
-    case 'es_dense':
-      return 'Dense vector retrieval';
-    case 'es_hybrid':
-      return 'BM25 + dense RRF';
-    case 'es_iterative_hybrid':
-      return 'Two-hop hybrid expansion';
     case 'tv_dense':
       return 'TurboVec dense retrieval';
     case 'tv_hybrid':

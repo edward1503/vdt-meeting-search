@@ -24,13 +24,10 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "nano_test_queries.tsv"
 BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
-ES_METHODS = {"es_bm25", "es_dense", "es_hybrid", "es_iterative_hybrid"}
+ES_METHODS = {"es_bm25"}
 TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
 ES_METHOD_MAP = {
     "es_bm25": "bm25",
-    "es_dense": "dense",
-    "es_hybrid": "hybrid",
-    "es_iterative_hybrid": "iterative_hybrid",
 }
 METHODS = ES_METHODS | TV_METHODS
 logger = logging.getLogger("uvicorn.error")

@@ -21,7 +21,7 @@ def test_search_history_store_records_lists_and_clears(tmp_path: Path) -> None:
     )
     second_id = store.record_search(
         query="What is Paris?",
-        method="es_hybrid",
+        method="tv_hybrid",
         top_k=10,
         latency_ms=33.2,
         cache_hit=True,
@@ -33,7 +33,7 @@ def test_search_history_store_records_lists_and_clears(tmp_path: Path) -> None:
 
     assert [row["id"] for row in rows] == [second_id, first_id]
     assert rows[0]["query"] == "What is Paris?"
-    assert rows[0]["method"] == "es_hybrid"
+    assert rows[0]["method"] == "tv_hybrid"
     assert rows[0]["top_k"] == 10
     assert rows[0]["result_count"] == 1
     assert rows[0]["top_docs"] == [{"doc_id": "d3", "title": "Paris", "score": 3.5, "rank": 1}]

@@ -32,7 +32,7 @@ export function QueriesView() {
     );
   }, [filter, queries]);
 
-  async function runSelectedSearch(method = 'es_hybrid') {
+  async function runSelectedSearch(method = 'tv_hybrid') {
     if (!selectedQuery) return;
     setRunState('Running search...');
     try {
@@ -169,12 +169,12 @@ export function QueriesView() {
 
         <div className="p-8 border-t border-outline-variant bg-white space-y-3 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
           {runState && <div className="text-xs font-mono text-primary font-bold uppercase tracking-widest">{runState}</div>}
-          <button onClick={() => runSelectedSearch('es_hybrid')} className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center space-x-3 hover:bg-primary/95 transition-all shadow-md active:scale-[0.98]">
+          <button onClick={() => runSelectedSearch('tv_hybrid')} className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center space-x-3 hover:bg-primary/95 transition-all shadow-md active:scale-[0.98]">
             <Bolt size={20} />
-            <span className="font-label text-xs tracking-[0.2em] uppercase">Run Hybrid Search</span>
+            <span className="font-label text-xs tracking-[0.2em] uppercase">Run TurboVec Hybrid</span>
           </button>
           <div className="grid grid-cols-2 gap-3">
-            <ActionButton Icon={Route} label="Iterative" onClick={() => runSelectedSearch('es_iterative_hybrid')} />
+            <ActionButton Icon={Route} label="BM25" onClick={() => runSelectedSearch('es_bm25')} />
             <ActionButton Icon={ExportNotes} label="Export" onClick={() => setRunState('Export uses the loaded API query set.')} />
           </div>
         </div>

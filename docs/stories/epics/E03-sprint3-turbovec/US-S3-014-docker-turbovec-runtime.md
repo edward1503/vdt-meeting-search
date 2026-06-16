@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -35,7 +35,7 @@ For the demo profile, Docker should default to the full runtime: `hotpotqa_full_
 ## Design Notes
 
 - Commands: no new user command is required for the full demo path; existing Docker Compose commands keep working, and env overrides can still select smaller profiles.
-- Queries: `tv_dense`, `tv_hybrid`, and `tv_filtered_hybrid` are the migration target; `es_dense` remains legacy and optional.
+- Queries: `tv_dense`, `tv_hybrid`, and `tv_filtered_hybrid` are the migration target; legacy ES dense/hybrid modes are not exposed by the Docker API or frontend.
 - API: no search request or response shape change is required.
 - Tables: no SQLite or Elasticsearch schema migration.
 - Domain rules: do not mix ES nano with TurboVec full for serious demos; use matching runtime profiles.
@@ -68,3 +68,5 @@ No Harness policy change is planned.
 - Docker API `POST /search` with `method=tv_dense`, `top_k=5`: returned 5 dense results from TurboVec, including `Ian Hunter (actor)` rank 1; no `sentence_transformers` import error.
 - Docker API `POST /search` with `method=tv_hybrid`, `top_k=5`: returned fused `bm25+dense` results in about 1415ms after TurboVec load, with latency breakdown including `embed`, `turbovec`, `hydrate`, `bm25`, and `fusion`.
 - Playwright CLI against `http://localhost:3001`: Status page displayed `FULL`, `5,233,329 docs`, full TurboVec index path, and TurboVec dataflow; Search page defaulted to `TurboVec Hybrid RRF (Full Dense + BM25)`, exposed `tv_dense`, `tv_filtered_hybrid`, and `tv_hybrid`, and returned 10 ranked frontend results with `Method: bm25+dense`.
+- Cleanup: `/stats` now exposes only `es_bm25`, `tv_dense`, `tv_filtered_hybrid`, and `tv_hybrid`; `/search` rejects `es_dense`, `es_hybrid`, and `es_iterative_hybrid` with HTTP 400; frontend controls no longer submit those legacy methods.
+- Runtime cleanup smoke: Docker API `/stats` returned only the four supported methods above; `POST /search` with `method=es_hybrid` returned HTTP 400; fresh `tv_hybrid` query `Which author wrote The Trial novel?` returned rank 1 `The Trial` with `source=bm25+dense`, `cache_hit=false`, and latency about 1353ms.
