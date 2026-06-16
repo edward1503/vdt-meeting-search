@@ -26,8 +26,8 @@ For the demo profile, Docker should default to the full runtime: `hotpotqa_full_
 
 - `requirements-api.txt` installs the minimum dependencies needed for TurboVec search in the API container: `numpy` and `turbovec`.
 - `TurboVecHybridRetriever.from_paths()` uses `EMBEDDING_SERVICE_URL` when configured and does not import `sentence_transformers` in that path.
-- Docker Compose defaults the API container to `ELASTICSEARCH_INDEX=hotpotqa_full_bm25_current` and `TURBOVEC_INDEX_PATH=/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`, while preserving env override support for nano/100k profiles.
-- A full demo runs without manually selecting nano-era defaults.
+- Docker Compose defaults the API container to `ELASTICSEARCH_INDEX=hotpotqa_full_bm25_current`, `DATASET_ID=beir/hotpotqa/dev`, and `TURBOVEC_INDEX_PATH=/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim`.
+- A full demo runs without nano-era defaults.
 - `/stats` shows enough runtime information to confirm the active Elasticsearch index, TurboVec artifact path, and embedding service URL.
 - The Docker frontend reads `/stats`, defaults the search selector to the backend `default_search_method`, shows only methods reported by the backend when available, and can run `tv_hybrid` through the existing `/api/search` proxy.
 - The status view displays backend-provided corpus/runtime details and TurboVec dataflow instead of hard-coded nano corpus or ES-dense language.
@@ -38,7 +38,7 @@ For the demo profile, Docker should default to the full runtime: `hotpotqa_full_
 - Queries: `tv_dense`, `tv_hybrid`, and `tv_filtered_hybrid` are the migration target; legacy ES dense/hybrid modes are not exposed by the Docker API or frontend.
 - API: no search request or response shape change is required.
 - Tables: no SQLite or Elasticsearch schema migration.
-- Domain rules: do not mix ES nano with TurboVec full for serious demos; use matching runtime profiles.
+- Domain rules: runtime/demo defaults use the full HotpotQA document index and full HotpotQA dev query split together.
 - UI surfaces: the search method selector, default method, status parameters, corpus count, and pipeline dataflow must align with `/stats` and the Docker runtime.
 
 ## Validation
@@ -72,3 +72,4 @@ No Harness policy change is planned.
 - Runtime cleanup smoke: Docker API `/stats` returned only the four supported methods above; `POST /search` with `method=es_hybrid` returned HTTP 400; fresh `tv_hybrid` query `Which author wrote The Trial novel?` returned rank 1 `The Trial` with `source=bm25+dense`, `cache_hit=false`, and latency about 1353ms.
 - Search support overlay: `/search` accepts optional `query_id`, returns a `support` summary, and marks each result with `is_support`; Docker API smoke using query id `5ae5669755429960a22e02ec` returned support `2/2`, `recall_at_k=1.0`, and first result `is_support=true`.
 - Playwright CLI against Search page: running the default HotpotQA query displayed `Gold Support`, `Found 2/2`, `Recall@10 1.000`, and `Support Hit` badges on the matching result cards.
+- Full query source: Docker/API runtime now defaults `DATASET_ID=beir/hotpotqa/dev` and uses `evaluation/results/hotpotqa_full_dev_queries.tsv` as the no-`ir_datasets` fallback; `/queries` returned `5447` full-dev queries with support doc ids, and a `tv_hybrid` search on the first query returned support `1/2` with `first_is_support=true`.

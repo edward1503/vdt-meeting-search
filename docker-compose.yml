@@ -35,6 +35,7 @@ services:
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-hotpotqa_full_bm25_current}
+      - DATASET_ID=${DATASET_ID:-beir/hotpotqa/dev}
       - REDIS_URL=redis://redis:6379/0
       - SEARCH_CACHE_TTL_SECONDS=${SEARCH_CACHE_TTL_SECONDS:-300}
       - PYTHONPATH=/app

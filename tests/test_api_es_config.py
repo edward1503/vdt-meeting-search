@@ -19,9 +19,20 @@ def test_api_exposes_only_bm25_es_method():
 def test_settings_exposes_elasticsearch_defaults():
     settings = Settings()
 
+    assert settings.dataset_id == "beir/hotpotqa/dev"
     assert settings.elasticsearch_url == "http://localhost:9200"
     assert settings.elasticsearch_index == "hotpotqa_docs_current"
     assert settings.embedding_model == "BAAI/bge-small-en-v1.5"
+
+
+def test_api_uses_full_hotpotqa_query_source():
+    from src.api import main
+
+    payload = main.stats()
+
+    assert payload["dataset_id"] == "beir/hotpotqa/dev"
+    assert "nano" not in main.QUERY_EXAMPLES_PATH.name.lower()
+    assert main.QUERY_EXAMPLES_PATH.exists()
 
 
 def test_load_query_examples_reads_supported_doc_ids(tmp_path):

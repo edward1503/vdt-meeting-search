@@ -8,7 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 
 @dataclass(frozen=True)
 class Settings:
-    dataset_id: str = os.getenv("DATASET_ID", "nano-beir/hotpotqa")
+    dataset_id: str = os.getenv("DATASET_ID", "beir/hotpotqa/dev")
     index_dir: Path = ROOT_DIR / "data" / "indexes"
     cache_dir: Path = ROOT_DIR / "data" / "cache"
     results_dir: Path = ROOT_DIR / "evaluation" / "results"

@@ -54,7 +54,7 @@ export function StatusView() {
             <Memory className="text-primary" size={24} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-outline-variant">
-            <SpecItem label="Dataset" value={stats?.dataset_id ?? 'nano-beir/hotpotqa'} />
+            <SpecItem label="Dataset" value={stats?.dataset_id ?? 'beir/hotpotqa/dev'} />
             <SpecItem label="Embedding Model" value={stats?.embedding_model ?? 'BAAI/bge-small-en-v1.5'} />
             <SpecItem label="Runtime Profile" value={runtimeProfileLabel(stats?.runtime_profile)} />
           </div>

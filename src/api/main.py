@@ -21,7 +21,7 @@ from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
 from src.retrieval.turbovec_retriever import TurboVecHybridRetriever
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "nano_test_queries.tsv"
+QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "hotpotqa_full_dev_queries.tsv"
 BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
 ES_METHODS = {"es_bm25"}
