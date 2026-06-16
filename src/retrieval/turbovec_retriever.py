@@ -1,11 +1,33 @@
 ﻿from __future__ import annotations
 
+import json
 import time
 from typing import Any
+from urllib import request
 
 import numpy as np
 
 from src.retrieval.elasticsearch_retriever import fuse_rrf
+
+
+class RemoteEmbeddingClient:
+    def __init__(self, embedding_service_url: str, timeout_seconds: int = 30) -> None:
+        self.embedding_service_url = embedding_service_url.rstrip("/")
+        self.timeout_seconds = timeout_seconds
+
+    def encode(self, texts: list[str], normalize_embeddings: bool = True, convert_to_numpy: bool = True) -> np.ndarray:
+        if len(texts) != 1:
+            raise ValueError("RemoteEmbeddingClient supports exactly one query at a time")
+        payload = json.dumps({"text": texts[0]}, separators=(",", ":")).encode("utf-8")
+        req = request.Request(
+            self.embedding_service_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with request.urlopen(req, timeout=self.timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return np.asarray([[float(value) for value in body["embedding"]]], dtype=np.float32)
 
 
 class ElasticsearchNumericDocStore:

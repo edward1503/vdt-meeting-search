@@ -131,3 +131,36 @@ def test_tv_filtered_hybrid_falls_back_to_broad_dense_when_allowlist_is_empty():
 
     assert calls == [{"k": 5, "allowlist": None}]
     assert [hit["doc_id"] for hit in hits] == ["d1", "d3"]
+
+def test_remote_embedding_client_returns_2d_float32_vector(monkeypatch):
+    from src.retrieval.turbovec_retriever import RemoteEmbeddingClient
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"embedding":[0.25,0.75]}'
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["body"] = req.data
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("src.retrieval.turbovec_retriever.request.urlopen", fake_urlopen)
+
+    client = RemoteEmbeddingClient("http://embedding:8010/embed", timeout_seconds=7)
+    vector = client.encode(["hello"], normalize_embeddings=True, convert_to_numpy=True)
+
+    assert captured["url"] == "http://embedding:8010/embed"
+    assert captured["body"] == b'{"text":"hello"}'
+    assert captured["timeout"] == 7
+    assert vector.dtype == np.float32
+    assert vector.shape == (1, 2)
+    assert vector.tolist() == [[0.25, 0.75]]
