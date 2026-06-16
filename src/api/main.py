@@ -32,19 +32,20 @@ ES_METHOD_MAP = {
 METHODS = ES_METHODS | TV_METHODS
 logger = logging.getLogger("uvicorn.error")
 
-def build_search_cache_key(*, index: str, query: str, method: str, top_k: int) -> str:
+def build_search_cache_key(*, index: str, query: str, method: str, top_k: int, query_id: str | None = None) -> str:
     payload = json.dumps(
         {
             "index": index,
             "method": method,
             "query": query.strip(),
+            "query_id": (query_id or "").strip(),
             "top_k": top_k,
         },
         sort_keys=True,
         separators=(",", ":"),
     )
     digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return f"search:v1:{digest}"
+    return f"search:v2:{digest}"
 
 @lru_cache(maxsize=1)
 def get_redis_client() -> Any | None:
@@ -92,6 +93,7 @@ app.add_middleware(
 
 
 class SearchRequest(BaseModel):
+    query_id: str | None = None
     query: str = Field(min_length=1)
     method: str = Field(default=settings.default_search_method)
     top_k: int = Field(default=10, ge=1, le=50)
@@ -104,7 +106,13 @@ def get_history_store() -> SearchHistoryStore:
     return store
 
 
-def find_support_doc_ids(query: str) -> list[str]:
+def find_support_doc_ids(query: str, query_id: str | None = None) -> list[str]:
+    normalized_query_id = (query_id or "").strip()
+    if normalized_query_id:
+        for row in get_query_examples():
+            if str(row.get("query_id", "")).strip() == normalized_query_id:
+                return [str(doc_id) for doc_id in row.get("support_doc_ids", [])]
+
     normalized = query.strip().lower()
     if not normalized:
         return []
@@ -112,6 +120,22 @@ def find_support_doc_ids(query: str) -> list[str]:
         if str(row.get("query", "")).strip().lower() == normalized:
             return [str(doc_id) for doc_id in row.get("support_doc_ids", [])]
     return []
+
+def build_support_summary(support_doc_ids: list[str], result_doc_ids: list[str]) -> dict[str, Any]:
+    support_set = set(support_doc_ids)
+    matched_doc_ids = [doc_id for doc_id in result_doc_ids if doc_id in support_set]
+    missing_doc_ids = [doc_id for doc_id in support_doc_ids if doc_id not in set(matched_doc_ids)]
+    total_count = len(support_doc_ids)
+    matched_count = len(matched_doc_ids)
+    return {
+        "available": total_count > 0,
+        "support_doc_ids": support_doc_ids,
+        "matched_doc_ids": matched_doc_ids,
+        "missing_doc_ids": missing_doc_ids,
+        "matched_count": matched_count,
+        "total_count": total_count,
+        "recall_at_k": round(matched_count / total_count, 4) if total_count else None,
+    }
 
 @lru_cache(maxsize=1)
 def get_es_retriever() -> ElasticsearchRetriever:
@@ -314,9 +338,11 @@ def search(request: SearchRequest) -> dict[str, Any]:
         query=request.query,
         method=method,
         top_k=request.top_k,
+        query_id=request.query_id,
     )
     cached = read_search_cache(cache_key)
     if cached is not None:
+        support_doc_ids = cached.get("support", {}).get("support_doc_ids") or find_support_doc_ids(cached["query"], cached.get("query_id"))
         cached["history_id"] = get_history_store().record_search(
             query=cached["query"],
             method=cached["method"],
@@ -324,7 +350,7 @@ def search(request: SearchRequest) -> dict[str, Any]:
             latency_ms=float(cached["latency_ms"]),
             cache_hit=True,
             results=cached["results"],
-            support_doc_ids=find_support_doc_ids(cached["query"]),
+            support_doc_ids=support_doc_ids,
         )
         return cached
 
@@ -344,25 +370,31 @@ def search(request: SearchRequest) -> dict[str, Any]:
     else:
         hits = get_es_retriever().search(request.query, ES_METHOD_MAP[method], request.top_k)
     latency_ms = round((time.perf_counter() - start) * 1000, 4)
+    support_doc_ids = find_support_doc_ids(request.query, request.query_id)
+    support_set = set(support_doc_ids)
+    results = [
+        {
+            "doc_id": str(hit.get("doc_id", "")),
+            "title": hit.get("title", ""),
+            "text": str(hit.get("text", ""))[:800],
+            "url": hit.get("url", ""),
+            "score": float(hit.get("score", 0.0)),
+            "rank": rank,
+            "source": hit.get("source", ES_METHOD_MAP.get(method, method)),
+            "hop": int(hit.get("hop", 1)),
+            "is_support": str(hit.get("doc_id", "")) in support_set,
+        }
+        for rank, hit in enumerate(hits, start=1)
+    ]
     response = {
+        "query_id": request.query_id,
         "query": request.query,
         "method": method,
         "top_k": request.top_k,
         "latency_ms": latency_ms,
         "cache_hit": False,
-        "results": [
-            {
-                "doc_id": hit.get("doc_id", ""),
-                "title": hit.get("title", ""),
-                "text": str(hit.get("text", ""))[:800],
-                "url": hit.get("url", ""),
-                "score": float(hit.get("score", 0.0)),
-                "rank": rank,
-                "source": hit.get("source", ES_METHOD_MAP.get(method, method)),
-                "hop": int(hit.get("hop", 1)),
-            }
-            for rank, hit in enumerate(hits, start=1)
-        ],
+        "support": build_support_summary(support_doc_ids, [result["doc_id"] for result in results]),
+        "results": results,
     }
     if latency_breakdown_ms is not None:
         response["latency_breakdown_ms"] = latency_breakdown_ms
@@ -374,7 +406,7 @@ def search(request: SearchRequest) -> dict[str, Any]:
         latency_ms=float(response["latency_ms"]),
         cache_hit=bool(response.get("cache_hit", False)),
         results=response["results"],
-        support_doc_ids=find_support_doc_ids(response["query"]),
+        support_doc_ids=support_doc_ids,
     )
     return response
 

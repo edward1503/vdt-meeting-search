@@ -20,6 +20,7 @@ export interface Query {
 
 export interface SearchPreset {
   id: number;
+  queryId?: string;
   query: string;
   method: string;
   topK: number;

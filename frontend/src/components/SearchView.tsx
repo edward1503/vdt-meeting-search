@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { getStats, searchHotpotQA, type SearchResult, type SearchResponse } from '@/src/lib/api';
+import { getStats, searchHotpotQA, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
 import type { SearchPreset } from '@/src/types';
 
 const SUGGESTIONS = [
@@ -27,6 +27,7 @@ function methodOptions(methods?: string[]) {
 
 export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   const [query, setQuery] = useState(SUGGESTIONS[0]);
+  const [queryId, setQueryId] = useState<string | undefined>(undefined);
   const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
   const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
@@ -50,20 +51,21 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   useEffect(() => {
     if (!preset) return;
     setQuery(preset.query);
+    setQueryId(preset.queryId);
     setMethod(availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid');
     setTopK(preset.topK);
     setResponse(null);
     setError(null);
   }, [availableMethods, preset]);
 
-  async function runSearch(nextQuery = query) {
+  async function runSearch(nextQuery = query, nextQueryId = queryId) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchHotpotQA(trimmed, method, topK);
+      const payload = await searchHotpotQA(trimmed, method, topK, nextQueryId);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -81,7 +83,10 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
             placeholder="Enter a complex retrieval query..."
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setQueryId(undefined);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') runSearch();
             }}
@@ -108,7 +113,8 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
               label={suggestion}
               onClick={() => {
                 setQuery(suggestion);
-                runSearch(suggestion);
+                setQueryId(undefined);
+                runSearch(suggestion, undefined);
               }}
             />
           ))}
@@ -151,6 +157,8 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
       </section>
 
       <section className="space-y-4">
+        {response?.support && <SupportCoverage support={response.support} topK={response.top_k} />}
+
         <div className="flex items-center justify-between pb-3 border-b-4 border-outline-variant/20">
           <div className="flex items-center gap-4">
             <Verified className="text-primary" size={24} />
@@ -211,6 +219,47 @@ function ControlItem({ label, children }: { label: string; children: ReactNode }
   );
 }
 
+function SupportCoverage({ support, topK }: { support: SearchSupportSummary; topK: number }) {
+  const recall = support.recall_at_k === null ? 'N/A' : support.recall_at_k.toFixed(3);
+  const missingPreview = support.missing_doc_ids.slice(0, 6);
+
+  return (
+    <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Gold Support</span>
+          {support.available ? (
+            <span className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded font-mono text-[10px] font-black uppercase tracking-widest">
+              Found {support.matched_count}/{support.total_count}
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded font-mono text-[10px] font-black uppercase tracking-widest">
+              Unavailable
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Recall@{topK}</span>
+          <span className="font-headline text-xl font-extrabold text-on-surface">{recall}</span>
+        </div>
+      </div>
+      {support.available && support.missing_doc_ids.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-outline-variant/30 pt-3">
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Missing</span>
+          {missingPreview.map((docId) => (
+            <span key={docId} className="px-2 py-1 bg-surface-container-low text-on-surface font-mono text-[10px] rounded border border-outline-variant/40 font-bold">
+              {docId}
+            </span>
+          ))}
+          {support.missing_doc_ids.length > missingPreview.length && (
+            <span className="font-mono text-[10px] text-on-surface-variant font-bold">+{support.missing_doc_ids.length - missingPreview.length}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({ result }: { key?: string; result: SearchResult }) {
   const isTop = result.rank === 1;
   return (
@@ -221,6 +270,7 @@ function ResultCard({ result }: { key?: string; result: SearchResult }) {
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <span className={cn('px-4 py-1.5 rounded font-mono text-[10px] font-black tracking-widest uppercase', isTop ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant')}>RANK {result.rank}</span>
+          {result.is_support && <span className="px-4 py-1.5 rounded font-mono text-[10px] font-black tracking-widest uppercase bg-primary/10 text-primary border border-primary/20">Support Hit</span>}
           <span className="px-4 py-1.5 bg-surface-container-high text-on-surface-variant rounded font-mono text-[10px] font-black tracking-widest uppercase">HOP {result.hop}</span>
           <span className="ml-auto font-mono text-[10px] text-on-surface-variant font-bold opacity-40">UID: {result.doc_id}</span>
           <div className={cn('flex items-center gap-2 font-mono text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest', isTop ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface')}>

@@ -36,8 +36,9 @@ export function QueriesView() {
     if (!selectedQuery) return;
     setRunState('Running search...');
     try {
-      const result = await searchHotpotQA(selectedQuery.text, method, 10);
-      setRunState(`Retrieved ${result.results.length} docs in ${Math.round(result.latency_ms)}ms`);
+      const result = await searchHotpotQA(selectedQuery.text, method, 10, selectedQuery.id);
+      const supportText = result.support?.available ? ` · support ${result.support.matched_count}/${result.support.total_count}` : '';
+      setRunState(`Retrieved ${result.results.length} docs in ${Math.round(result.latency_ms)}ms${supportText}`);
     } catch (err) {
       setRunState(err instanceof Error ? err.message : 'Search failed');
     }

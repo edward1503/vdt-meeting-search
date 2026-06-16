@@ -11,13 +11,26 @@ export interface SearchResult {
   rank: number;
   source: string;
   hop: number;
+  is_support?: boolean;
+}
+
+export interface SearchSupportSummary {
+  available: boolean;
+  support_doc_ids: string[];
+  matched_doc_ids: string[];
+  missing_doc_ids: string[];
+  matched_count: number;
+  total_count: number;
+  recall_at_k: number | null;
 }
 
 export interface SearchResponse {
+  query_id?: string | null;
   query: string;
   method: string;
   top_k: number;
   latency_ms: number;
+  support?: SearchSupportSummary;
   results: SearchResult[];
 }
 
@@ -118,10 +131,10 @@ export async function getBenchmark(): Promise<BenchmarkResult[]> {
   return rows.map((row) => ({ ...row, isPeak: row.recall10 === bestRecall }));
 }
 
-export async function searchHotpotQA(query: string, method: string, topK: number): Promise<SearchResponse> {
+export async function searchHotpotQA(query: string, method: string, topK: number, queryId?: string): Promise<SearchResponse> {
   return apiFetch('/search', {
     method: 'POST',
-    body: JSON.stringify({ query, method, top_k: topK }),
+    body: JSON.stringify({ query_id: queryId, query, method, top_k: topK }),
   });
 }
 

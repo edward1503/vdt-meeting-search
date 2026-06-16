@@ -64,6 +64,22 @@ def test_build_query_examples_joins_queries_and_qrels():
     ]
 
 
+def test_find_support_doc_ids_prefers_query_id(monkeypatch):
+    from src.api import main
+
+    monkeypatch.setattr(
+        main,
+        "get_query_examples",
+        lambda: [
+            {"query_id": "q1", "query": "Original question", "support_doc_ids": ["d1", "d2"]},
+            {"query_id": "q2", "query": "Question two", "support_doc_ids": ["d3"]},
+        ],
+    )
+
+    assert main.find_support_doc_ids("paraphrased text", query_id="q1") == ["d1", "d2"]
+    assert main.find_support_doc_ids("Question two") == ["d3"]
+
+
 def test_load_benchmark_result_reads_json(tmp_path):
     from src.api import main
 
@@ -134,7 +150,7 @@ def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     monkeypatch.setattr(main, "read_search_cache", lambda cache_key: None)
     monkeypatch.setattr(main, "write_search_cache", lambda cache_key, payload: None)
     monkeypatch.setattr(main, "get_history_store", lambda: FakeHistoryStore())
-    monkeypatch.setattr(main, "find_support_doc_ids", lambda query: [])
+    monkeypatch.setattr(main, "find_support_doc_ids", lambda query, query_id=None: [])
     monkeypatch.setattr(main, "get_tv_retriever", lambda: FakeTVRetriever())
 
     response = main.search(main.SearchRequest(query="Who connects Alpha and Beta?", method="tv_hybrid", top_k=1))
@@ -144,6 +160,51 @@ def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     assert response["history_id"] == 123
     assert response["latency_breakdown_ms"] == {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
     assert response["results"][0]["source"] == "bm25+dense"
+
+
+def test_search_returns_support_summary_and_marks_support_hits(monkeypatch):
+    from src.api import main
+
+    captured_history = {}
+
+    class FakeTVRetriever:
+        last_timing_ms = {"embed": 1.0, "turbovec": 2.0}
+
+        def search(self, query, method, top_k, bm25_k=100, dense_k=100, rrf_k=60):
+            return [
+                {"doc_id": "d2", "title": "Support", "text": "body", "url": "", "score": 2.0, "source": "bm25+dense"},
+                {"doc_id": "d9", "title": "Distractor", "text": "body", "url": "", "score": 1.0, "source": "bm25+dense"},
+            ]
+
+    class FakeHistoryStore:
+        def record_search(self, **kwargs):
+            captured_history.update(kwargs)
+            return 456
+
+    monkeypatch.setattr(main, "read_search_cache", lambda cache_key: None)
+    monkeypatch.setattr(main, "write_search_cache", lambda cache_key, payload: None)
+    monkeypatch.setattr(main, "get_history_store", lambda: FakeHistoryStore())
+    monkeypatch.setattr(main, "get_tv_retriever", lambda: FakeTVRetriever())
+    monkeypatch.setattr(
+        main,
+        "get_query_examples",
+        lambda: [{"query_id": "q1", "query": "Original question", "support_doc_ids": ["d1", "d2"]}],
+    )
+
+    response = main.search(main.SearchRequest(query="paraphrased question", query_id="q1", method="tv_hybrid", top_k=2))
+
+    assert response["query_id"] == "q1"
+    assert response["support"] == {
+        "available": True,
+        "support_doc_ids": ["d1", "d2"],
+        "matched_doc_ids": ["d2"],
+        "missing_doc_ids": ["d1"],
+        "matched_count": 1,
+        "total_count": 2,
+        "recall_at_k": 0.5,
+    }
+    assert [hit["is_support"] for hit in response["results"]] == [True, False]
+    assert captured_history["support_doc_ids"] == ["d1", "d2"]
 
 
 def test_stats_exposes_turbovec_runtime_path():
