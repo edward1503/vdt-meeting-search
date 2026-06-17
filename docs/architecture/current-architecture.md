@@ -1,17 +1,16 @@
-﻿# Current Architecture
+# Current Architecture
 
-Last updated: 2026-06-13
+Last updated: 2026-06-16
 
-This document describes the current architecture of `vdt-meeting-search`. The active system is an Elasticsearch-only retrieval baseline for HotpotQA multi-hop retrieval. VimQA data exists in the repository, but it is not yet integrated as a first-class benchmark dataset.
+This document describes the current architecture of `vdt-meeting-search`. The active system is a full-corpus HotpotQA retrieval demo: Elasticsearch serves BM25 and document hydration, TurboVec serves dense retrieval over the full 5.23M-document corpus, Redis caches search responses, and the React dashboard runs against `beir/hotpotqa/dev` queries/qrels.
 
 ## 1. System Overview
 
 ```text
-HotpotQA via ir_datasets
+HotpotQA full corpus + beir/hotpotqa/dev queries
   -> staging JSONL shards
-  -> SentenceTransformer embeddings
-  -> Elasticsearch index
-  -> retrieval methods
+  -> Elasticsearch BM25 index + TurboVec dense index
+  -> retrieval methods / support overlay
   -> benchmark metrics / FastAPI API
   -> React dashboard
 ```
@@ -20,7 +19,7 @@ HotpotQA via ir_datasets
 |---|---|---|
 | Dataset / ETL | `scripts/stage_hotpotqa.py`, `src/data/staging.py` | Load HotpotQA from `ir_datasets`, normalize documents, write staging JSONL |
 | Ingest | `scripts/es_hotpotqa.py` | Create index, encode embeddings, bulk ingest, validate count, search CLI |
-| Retrieval | `src/retrieval/elasticsearch_retriever.py` | BM25, dense kNN, hybrid RRF, iterative hybrid |
+| Retrieval | `src/retrieval/elasticsearch_retriever.py`, `src/retrieval/turbovec_retriever.py` | BM25, TurboVec dense, TurboVec hybrid RRF, filtered TurboVec hybrid |
 | Evaluation | `src/evaluation/benchmark_es.py`, `src/evaluation/metrics.py` | Run benchmarks, write TREC runs, compute metrics |
 | API | `src/api/main.py` | FastAPI endpoints for health, stats, queries, benchmark, history, search |
 | Cache | Redis | Cache repeated `/search` responses by query/method/top-k/index |
@@ -55,7 +54,7 @@ artifacts/*/progress    Ingest done markers
 
 ## 3. Data Pipeline
 
-HotpotQA is loaded directly from `ir_datasets`. The default configured dataset is `nano-beir/hotpotqa`.
+HotpotQA documents are loaded from the full `beir/hotpotqa` corpus. API query examples and gold support labels default to `beir/hotpotqa/dev`; Docker uses `evaluation/results/hotpotqa_full_dev_queries.tsv` as the fallback query/qrels file because the API image intentionally does not install `ir_datasets`.
 
 `src/data/staging.py` normalizes every document into this staging shape:
 
@@ -75,8 +74,8 @@ HotpotQA is loaded directly from `ir_datasets`. The default configured dataset i
 Staging writes JSONL shards such as:
 
 ```text
-artifacts/nano/staging/docs-00000.jsonl
-artifacts/nano/staging/manifest.json
+artifacts/hotpotqa_full/staging/docs-00000.jsonl
+artifacts/hotpotqa_full/staging/manifest.json
 ```
 
 ## 4. Elasticsearch Indexing
@@ -111,26 +110,16 @@ Progress markers under `artifacts/.../progress` allow interrupted ingest jobs to
 
 ## 5. Retrieval Layer
 
-Retrieval logic lives in `src/retrieval/elasticsearch_retriever.py`.
+Retrieval logic lives in `src/retrieval/elasticsearch_retriever.py` and `src/retrieval/turbovec_retriever.py`.
 
 | Method | Internal name | Behavior |
 |---|---|---|
 | `es_bm25` | `bm25` | Elasticsearch `multi_match` over `title^2` and `content` |
-| `es_dense` | `dense` | Encode query and run ES kNN over `embedding` |
-| `es_hybrid` | `hybrid` | Retrieve BM25 and dense candidates, then fuse by RRF |
-| `es_iterative_hybrid` | `iterative_hybrid` | Hop 1 hybrid, expand query from first-hop evidence, hop 2 hybrid, RRF fuse all hops |
+| `tv_dense` | `tv_dense` | Encode query through the host embedding service and search the mounted TurboVec index |
+| `tv_hybrid` | `tv_hybrid` | Retrieve BM25 and TurboVec dense candidates, then fuse by RRF |
+| `tv_filtered_hybrid` | `tv_filtered_hybrid` | Use BM25 candidates as an allowlist for TurboVec dense search, then fuse results |
 
-Dense query embedding can run in-process with `SentenceTransformer`, or through a remote HTTP embedding endpoint when `EMBEDDING_SERVICE_URL` is configured.
-
-Iterative hybrid currently uses this flow:
-
-```text
-Hop 1: run hybrid(query), take first_hop_k docs.
-Hop 2: for each hop-1 doc, run hybrid(query + title + text prefix), take second_hop_k docs.
-Fusion: RRF-fuse hop-1 and hop-2 rankings.
-```
-
-The benchmark CLI also has internal iterative variants: `es_iterative_title`, `es_iterative_sentence`, and `es_iterative_fast`.
+In Docker, query embeddings are produced by the host HTTP embedding endpoint configured with `EMBEDDING_SERVICE_URL`. The API container does not install PyTorch or SentenceTransformers.
 
 ## 6. Benchmark Layer
 
@@ -139,7 +128,7 @@ The benchmark CLI also has internal iterative variants: `es_iterative_title`, `e
 Important CLI inputs:
 
 ```text
---dataset          ir_datasets id, default nano-beir/hotpotqa
+--dataset          ir_datasets id, default beir/hotpotqa/dev
 --index            Elasticsearch index or alias
 --methods          comma-separated method names
 --top-k
@@ -155,7 +144,7 @@ Important CLI inputs:
 
 Outputs are written to `evaluation/results/*.json` and `evaluation/runs/**/*.trec`.
 
-Metrics are computed in `src/evaluation/metrics.py`: `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency p50/p95/p99, and QPS.
+Metrics are computed in `src/evaluation/metrics.py`: `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency p50/p95/p99, and QPS. The dashboard surfaces the current 200-query full-corpus dev benchmark as project progress and keeps legacy nano benchmarks below it; paper-comparable claims should use the full `beir/hotpotqa/test` split.
 
 `full_support_recall@k` is important for HotpotQA because many queries need all supporting documents, not just one relevant hit.
 
@@ -168,8 +157,8 @@ The FastAPI app is in `src/api/main.py`.
 | `/health` | GET | Health check |
 | `/stats` | GET | Runtime config: backend, index, dataset, model, cache, history path |
 | `/queries` | GET | Query examples and support docs from `ir_datasets` or TSV fallback |
-| `/benchmark` | GET | Benchmark JSON artifact |
-| `/search` | POST | Run a retrieval method through `ElasticsearchRetriever` |
+| `/benchmark` | GET | Benchmark dashboard payload with current full-corpus project-progress results plus legacy nano history |
+| `/search` | POST | Run BM25/TurboVec retrieval and return support coverage metadata |
 | `/history` | GET | List search history |
 | `/history/{id}` | GET | Return one search history entry |
 | `/history` | DELETE | Clear search history |
@@ -178,13 +167,14 @@ Search request shape:
 
 ```json
 {
+  "query_id": "...",
   "query": "...",
-  "method": "es_hybrid",
+  "method": "tv_hybrid",
   "top_k": 10
 }
 ```
 
-When `REDIS_URL` is set, `/search` responses are cached by `index + query + method + top_k`. If Redis is unavailable, the API falls back to direct Elasticsearch search.
+When `REDIS_URL` is set, `/search` responses are cached by `index + query_id + query + method + top_k`. If Redis is unavailable, the API falls back to direct retrieval. `/search` responses include a `support` summary and per-result `is_support` flag when qrels are available.
 
 `src/api/history.py` stores search history in SQLite. The default path is `data/query_history.sqlite3`; in Docker Compose it is backed by the `history_data` volume.
 
@@ -225,24 +215,23 @@ Runtime settings live in `src/core/config.py`.
 
 | Env var | Default | Role |
 |---|---|---|
-| `DATASET_ID` | `nano-beir/hotpotqa` | Dataset used by API query examples |
+| `DATASET_ID` | `beir/hotpotqa/dev` | Full HotpotQA split used by API query examples and support labels |
 | `ELASTICSEARCH_URL` | `http://localhost:9200` | Elasticsearch endpoint |
-| `ELASTICSEARCH_INDEX` | `hotpotqa_docs_current` | Search index or alias |
+| `ELASTICSEARCH_INDEX` | `hotpotqa_docs_current` locally, `hotpotqa_full_bm25_current` in Docker | Search index or alias |
 | `ELASTICSEARCH_NUM_CANDIDATES` | `1000` | Default dense kNN candidate count |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-en-v1.5` | SentenceTransformer model |
-| `EMBEDDING_SERVICE_URL` | empty | Remote embedding endpoint, when configured |
+| `EMBEDDING_SERVICE_URL` | empty locally, `http://host.docker.internal:8010/embed` in Docker | Remote embedding endpoint, when configured |
 | `REDIS_URL` | empty | Redis cache URL |
 | `SEARCH_CACHE_TTL_SECONDS` | `300` | Search cache TTL |
 | `HISTORY_DB_PATH` | `data/query_history.sqlite3` | SQLite history path |
-| `MULTIHOP_FIRST_HOP` | `5` | Iterative retrieval hop-1 size |
-| `MULTIHOP_SECOND_HOP` | `10` | Iterative retrieval hop-2 size |
-| `MULTIHOP_CONTEXT_CHARS` | `256` | Text prefix used for query expansion |
+| `TURBOVEC_INDEX_PATH` | `artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim` | Mounted TurboVec dense index |
+| `DEFAULT_SEARCH_METHOD` | `tv_hybrid` | Default dashboard/API search method |
 
 ## 11. Dataset Boundaries
 
 ### HotpotQA
 
-HotpotQA is the officially integrated dataset in the current code path. The code assumes the dataset exposes `docs_iter()`, `queries_iter()`, and `qrels_iter()` through `ir_datasets`. Benchmark qrels come from `ir_datasets` unless `--qrels-file` is provided. API `/queries` also prefers query/qrels data from `ir_datasets`.
+HotpotQA is the officially integrated dataset in the current code path. Documents come from the full `beir/hotpotqa` corpus; API examples and support labels use `beir/hotpotqa/dev`. Benchmark qrels come from `ir_datasets` unless `--qrels-file` is provided. API `/queries` prefers query/qrels data from `ir_datasets` and falls back to `evaluation/results/hotpotqa_full_dev_queries.tsv` in Docker.
 
 ### VimQA
 
@@ -275,12 +264,11 @@ VimQA is currently a single-context QA dataset, not a BEIR-style retrieval datas
 ## 12. Known Limitations
 
 1. The dataset layer is still hard-coded around HotpotQA and `ir_datasets`.
-2. The benchmark runner always loads `ir_datasets` before running, even when `--query-file` and `--qrels-file` are provided.
+2. The benchmark runner still depends on `ir_datasets` for standard HotpotQA runs.
 3. VimQA is not isolated as a first-class dataset yet.
 4. API labels and dashboard copy are still HotpotQA-oriented.
 5. The default embedding model is English BGE small, not optimized for Vietnamese.
-6. `es_iterative_hybrid` is heuristic, has high latency, and does not currently beat `es_hybrid` on the nano benchmark.
-7. The full HotpotQA corpus of 5.23M docs has not been ingested/indexed in the active baseline.
+6. First TurboVec load after API reload can be slower than warm searches because the full `.tvim` artifact is opened on demand.
 
 ## 13. Recommended Direction For Dataset Isolation
 
@@ -297,7 +285,7 @@ Each adapter should expose the same contract: `docs_iter()`, `queries(max_querie
 Artifacts should also be separated by dataset:
 
 ```text
-artifacts/hotpotqa/nano/...
+artifacts/hotpotqa_full/...
 artifacts/vimqa/test/...
 evaluation/results/hotpotqa/...
 evaluation/results/vimqa/...
@@ -308,7 +296,7 @@ evaluation/runs/vimqa/...
 Elasticsearch indexes and aliases should be separate too:
 
 ```text
-hotpotqa_nano_v1        -> hotpotqa_nano_current
+hotpotqa_full_bm25_v1   -> hotpotqa_full_bm25_current
 vimqa_test_v1           -> vimqa_test_current
 ```
 

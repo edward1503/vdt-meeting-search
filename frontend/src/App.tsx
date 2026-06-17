@@ -26,7 +26,7 @@ export default function App() {
   const renderView = () => {
     switch (activeView) {
       case 'search': return <SearchView preset={searchPreset} />;
-      case 'queries': return <QueriesView />;
+      case 'queries': return <QueriesView onSearchQuery={(preset) => { setSearchPreset(preset); setActiveView('search'); }} />;
       case 'benchmark': return <BenchmarkView />;
       case 'history': return <HistoryView onRunAgain={(preset) => { setSearchPreset(preset); setActiveView('search'); }} />;
       case 'status': return <StatusView />;

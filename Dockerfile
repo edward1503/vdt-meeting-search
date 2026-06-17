@@ -18,7 +18,7 @@ WORKDIR /app
 COPY src ./src
 COPY scripts ./scripts
 COPY evaluation ./evaluation
-COPY artifacts ./artifacts
+RUN mkdir -p /app/artifacts /app/data
 EXPOSE 8000
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
 

@@ -10,3 +10,16 @@ frontend/dist
 hotpotqa-retrieval-dashboard/node_modules
 output
 logs
+artifacts
+hotpotqa_bge_embeddings
+hotpotqa_bge_embeddings.tar.gz
+frontend
+docs
+notebooks
+output
+test-results
+tmp
+tests
+problem
+.superpowers
+harness.db

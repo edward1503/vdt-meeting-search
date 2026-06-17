@@ -131,3 +131,65 @@ def test_tv_filtered_hybrid_falls_back_to_broad_dense_when_allowlist_is_empty():
 
     assert calls == [{"k": 5, "allowlist": None}]
     assert [hit["doc_id"] for hit in hits] == ["d1", "d3"]
+
+def test_remote_embedding_client_returns_2d_float32_vector(monkeypatch):
+    from src.retrieval.turbovec_retriever import RemoteEmbeddingClient
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"embedding":[0.25,0.75]}'
+
+    def fake_urlopen(req, timeout):
+        captured["url"] = req.full_url
+        captured["body"] = req.data
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("src.retrieval.turbovec_retriever.request.urlopen", fake_urlopen)
+
+    client = RemoteEmbeddingClient("http://embedding:8010/embed", timeout_seconds=7)
+    vector = client.encode(["hello"], normalize_embeddings=True, convert_to_numpy=True)
+
+    assert captured["url"] == "http://embedding:8010/embed"
+    assert captured["body"] == b'{"text":"hello"}'
+    assert captured["timeout"] == 7
+    assert vector.dtype == np.float32
+    assert vector.shape == (1, 2)
+    assert vector.tolist() == [[0.25, 0.75]]
+
+def test_turbovec_from_paths_uses_remote_embedder_when_url_is_configured(monkeypatch):
+    import sys
+
+    from src.retrieval import turbovec_retriever
+
+    class FakeIdMapIndex:
+        @staticmethod
+        def load(path):
+            return {"loaded": path}
+
+    class FakeTurboVecModule:
+        IdMapIndex = FakeIdMapIndex
+
+    monkeypatch.setitem(sys.modules, "turbovec", FakeTurboVecModule())
+
+    retriever = turbovec_retriever.TurboVecHybridRetriever.from_paths(
+        bm25_retriever=object(),
+        es=object(),
+        index="hotpotqa_full_bm25_current",
+        tv_index_path="/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim",
+        model_name="BAAI/bge-small-en-v1.5",
+        embedding_service_url="http://host.docker.internal:8010/embed",
+        embedding_timeout_seconds=9,
+    )
+
+    assert isinstance(retriever.embedder, turbovec_retriever.RemoteEmbeddingClient)
+    assert retriever.embedder.embedding_service_url == "http://host.docker.internal:8010/embed"
+    assert retriever.embedder.timeout_seconds == 9

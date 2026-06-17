@@ -219,17 +219,17 @@ def _search_method(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Benchmark Elasticsearch HotpotQA retrieval")
+    parser = argparse.ArgumentParser(description="Benchmark HotpotQA retrieval")
     parser.add_argument("--dataset", default=settings.dataset_id)
     parser.add_argument("--index", default=settings.elasticsearch_index)
-    parser.add_argument("--methods", default="es_bm25,es_dense,es_hybrid")
+    parser.add_argument("--methods", default="es_bm25,tv_hybrid")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--max-queries", type=int, default=None)
     parser.add_argument("--url", default=settings.elasticsearch_url)
     parser.add_argument("--model", default=settings.embedding_model)
     parser.add_argument("--num-candidates", type=int, default=settings.elasticsearch_num_candidates)
     parser.add_argument("--candidate-k", type=int, default=100)
-    parser.add_argument("--output", type=Path, default=Path("evaluation/results/es_benchmark.json"))
+    parser.add_argument("--output", type=Path, default=Path("evaluation/results/retrieval_benchmark.json"))
     parser.add_argument("--run-dir", type=Path, default=Path("evaluation/runs"))
     parser.add_argument("--query-file", type=Path, default=None)
     parser.add_argument("--qrels-file", type=Path, default=None)

@@ -34,13 +34,19 @@ services:
     container_name: vdt-hotpotqa-api
     environment:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
-      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-hotpotqa_nano_current}
+      - ELASTICSEARCH_INDEX=${ELASTICSEARCH_INDEX:-hotpotqa_full_bm25_current}
+      - DATASET_ID=${DATASET_ID:-beir/hotpotqa/dev}
       - REDIS_URL=redis://redis:6379/0
       - SEARCH_CACHE_TTL_SECONDS=${SEARCH_CACHE_TTL_SECONDS:-300}
       - PYTHONPATH=/app
       - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://host.docker.internal:8010/embed}
       - EMBEDDING_TIMEOUT_SECONDS=${EMBEDDING_TIMEOUT_SECONDS:-30}
       - WARMUP_EMBEDDING_MODEL=${WARMUP_EMBEDDING_MODEL:-false}
+      - TURBOVEC_INDEX_PATH=${TURBOVEC_INDEX_PATH:-/app/artifacts/hotpotqa_full/turbovec/hotpotqa_bge_small_4bit.tvim}
+      - DEFAULT_SEARCH_METHOD=${DEFAULT_SEARCH_METHOD:-tv_hybrid}
+      - HYBRID_BM25_K=${HYBRID_BM25_K:-50}
+      - HYBRID_DENSE_K=${HYBRID_DENSE_K:-50}
+      - RRF_K=${RRF_K:-30}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

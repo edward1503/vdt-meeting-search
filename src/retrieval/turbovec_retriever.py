@@ -1,11 +1,33 @@
 ﻿from __future__ import annotations
 
+import json
 import time
 from typing import Any
+from urllib import request
 
 import numpy as np
 
 from src.retrieval.elasticsearch_retriever import fuse_rrf
+
+
+class RemoteEmbeddingClient:
+    def __init__(self, embedding_service_url: str, timeout_seconds: int = 30) -> None:
+        self.embedding_service_url = embedding_service_url.rstrip("/")
+        self.timeout_seconds = timeout_seconds
+
+    def encode(self, texts: list[str], normalize_embeddings: bool = True, convert_to_numpy: bool = True) -> np.ndarray:
+        if len(texts) != 1:
+            raise ValueError("RemoteEmbeddingClient supports exactly one query at a time")
+        payload = json.dumps({"text": texts[0]}, separators=(",", ":")).encode("utf-8")
+        req = request.Request(
+            self.embedding_service_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with request.urlopen(req, timeout=self.timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return np.asarray([[float(value) for value in body["embedding"]]], dtype=np.float32)
 
 
 class ElasticsearchNumericDocStore:
@@ -46,14 +68,29 @@ class TurboVecHybridRetriever:
         self.last_timing_ms: dict[str, float] = {}
 
     @classmethod
-    def from_paths(cls, bm25_retriever: Any, es: Any, index: str, tv_index_path: str, model_name: str) -> "TurboVecHybridRetriever":
-        from sentence_transformers import SentenceTransformer
+    def from_paths(
+        cls,
+        bm25_retriever: Any,
+        es: Any,
+        index: str,
+        tv_index_path: str,
+        model_name: str,
+        embedding_service_url: str = "",
+        embedding_timeout_seconds: int = 30,
+    ) -> "TurboVecHybridRetriever":
         from turbovec import IdMapIndex
+
+        if embedding_service_url:
+            embedder = RemoteEmbeddingClient(embedding_service_url, timeout_seconds=embedding_timeout_seconds)
+        else:
+            from sentence_transformers import SentenceTransformer
+
+            embedder = SentenceTransformer(model_name)
 
         return cls(
             bm25_retriever=bm25_retriever,
             tv_index=IdMapIndex.load(tv_index_path),
-            embedder=SentenceTransformer(model_name),
+            embedder=embedder,
             docstore=ElasticsearchNumericDocStore(es, index),
         )
 

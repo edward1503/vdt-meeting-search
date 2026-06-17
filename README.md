@@ -1,15 +1,15 @@
-# HotpotQA Elasticsearch Retrieval Baseline
+# HotpotQA Full-Corpus TurboVec Retrieval
 
-This project implements an Elasticsearch-only baseline for the VDT Hybrid Information Retrieval task on HotpotQA multi-hop retrieval.
+This project implements a full-corpus HotpotQA retrieval demo with Elasticsearch BM25, TurboVec dense search, Redis caching, and a React dashboard.
 
-The active baseline methods are:
+The active demo methods are:
 
 - `es_bm25`: Elasticsearch lexical retrieval over `title^2` and `content`.
-- `es_dense`: Elasticsearch kNN retrieval over BGE embeddings.
-- `es_hybrid`: BM25 and dense candidates fused with Reciprocal Rank Fusion.
-- `es_iterative_hybrid`: two-hop Elasticsearch hybrid retrieval with query expansion from first-hop evidence.
+- `tv_dense`: TurboVec dense retrieval over the full HotpotQA `.tvim` artifact.
+- `tv_hybrid`: BM25 and TurboVec dense candidates fused with Reciprocal Rank Fusion.
+- `tv_filtered_hybrid`: BM25-candidate-filtered TurboVec hybrid retrieval.
 
-Legacy local retrieval baselines have been removed from the active code path.
+The active Docker profile uses `beir/hotpotqa/dev` queries and qrels against the full `hotpotqa_full_bm25_current` document index. Nano HotpotQA is no longer part of the runtime/demo default.
 
 ## Setup
 
@@ -21,19 +21,19 @@ pip install -r requirements.txt
 
 ```bash
 docker compose up -d elasticsearch
-python scripts/stage_hotpotqa.py --dataset nano-beir/hotpotqa --output-dir artifacts/nano/staging --docs-per-file 2000
-python scripts/es_hotpotqa.py create-index --index hotpotqa_nano_v1 --alias hotpotqa_nano_current --reset
-python scripts/es_hotpotqa.py ingest --index hotpotqa_nano_v1 --staging-dir artifacts/nano/staging --progress-dir artifacts/nano/progress --batch-size 64
-python scripts/es_hotpotqa.py validate --index hotpotqa_nano_current --expected-count 5090
+python scripts/stage_hotpotqa.py --dataset beir/hotpotqa --output-dir artifacts/hotpotqa_full/staging --docs-per-file 50000
+python scripts/es_hotpotqa.py create-index --index hotpotqa_full_bm25_v1 --alias hotpotqa_full_bm25_current --reset
+python scripts/es_hotpotqa.py ingest --index hotpotqa_full_bm25_v1 --staging-dir artifacts/hotpotqa_full/staging --progress-dir artifacts/hotpotqa_full/progress --batch-size 256
+python scripts/es_hotpotqa.py validate --index hotpotqa_full_bm25_current --expected-count 5233329
 ```
 
 ## Benchmark
 
 ```bash
-python -m src.evaluation.benchmark_es --dataset nano-beir/hotpotqa --index hotpotqa_nano_current --methods es_bm25,es_dense,es_hybrid,es_iterative_hybrid --top-k 10 --candidate-k 100 --num-candidates 100 --rrf-k 30 --first-hop-k 5 --second-hop-k 10 --context-chars 256 --output evaluation/results/es_nano_iterative.json --run-dir evaluation/runs/iterative
+python -m src.evaluation.benchmark_es --dataset beir/hotpotqa/dev --index hotpotqa_full_bm25_current --methods es_bm25,tv_dense,tv_hybrid --top-k 10 --max-queries 200 --candidate-k 50 --num-candidates 50 --rrf-k 30 --output evaluation/results/hotpotqa_full/tv_full_200.json --run-dir evaluation/runs/hotpotqa_full
 ```
 
-The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency percentiles, and QPS.
+The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency percentiles, and QPS. The dashboard benchmark page now treats the full-corpus 200-query dev run as a project-progress pilot for `es_bm25`, `tv_dense`, `tv_filtered_hybrid`, and `tv_hybrid`, with legacy nano/Elasticsearch results shown separately. Use the full `beir/hotpotqa/test` split with 7,405 queries before making BEIR/paper-comparable claims.
 
 ## Docker Development Stack
 
@@ -60,7 +60,7 @@ Open:
 - Elasticsearch: `http://localhost:9200`
 - Redis: internal Compose service `redis:6379`
 
-The frontend container uses Vite hot reload with `./frontend:/app` and a Docker named volume for `/app/node_modules`. The API container uses Uvicorn reload with bind-mounted Python source. Redis caches repeated `/search` responses using `REDIS_URL` and `SEARCH_CACHE_TTL_SECONDS`. Dense and hybrid search call the local embedding service at `http://host.docker.internal:8010/embed`, so PyTorch and SentenceTransformers stay outside the Docker API image.
+The frontend container uses Vite hot reload with `./frontend:/app` and a Docker named volume for `/app/node_modules`. The API container uses Uvicorn reload with bind-mounted Python source. Redis caches repeated `/search` responses using `REDIS_URL` and `SEARCH_CACHE_TTL_SECONDS`. TurboVec search loads the mounted full `.tvim` artifact from `./artifacts`, and query embeddings call the local embedding service at `http://host.docker.internal:8010/embed`, so PyTorch and SentenceTransformers stay outside the Docker API image.
 
 ## API Demo
 
@@ -80,18 +80,6 @@ Open `http://localhost:3001`.
 - `docs/baseline/elasticsearch-baseline.md`: lean Elasticsearch commands and policy.
 - `docs/baseline/paraphrase-robustness-report.md`: 50-query paraphrase robustness benchmark report.
 
-## Paraphrase Robustness Benchmark
+## Query Set
 
-Generate deterministic synonym paraphrases for 50 HotpotQA queries:
-
-```bash
-python scripts/paraphrase_queries.py --input evaluation/results/nano_test_queries.tsv --limit 50 --ratios 0.2,0.4,0.6 --variants-per-ratio 1 --seed 13
-```
-
-Benchmark the original 50-query baseline and each paraphrase ratio with `--query-file`. Compare against the original run:
-
-```bash
-python scripts/compare_paraphrase_results.py --baseline evaluation/results/es_nano_original_50.json --variant syn020=evaluation/results/es_nano_paraphrase_syn020.json --variant syn040=evaluation/results/es_nano_paraphrase_syn040.json --variant syn060=evaluation/results/es_nano_paraphrase_syn060.json --output evaluation/results/paraphrase_summary.csv
-```
-
-Current artifacts are written under `evaluation/results/` and TREC runs under `evaluation/runs/paraphrase/`.
+The dashboard query browser uses `beir/hotpotqa/dev` and the checked-in fallback file `evaluation/results/hotpotqa_full_dev_queries.tsv`. The `/queries` API is paginated with `limit`, `offset`, and `search` parameters, and the frontend defaults to 10 queries per page so Docker runtime stays on the full HotpotQA profile without loading the whole query set into the browser.

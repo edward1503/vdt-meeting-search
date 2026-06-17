@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { searchHotpotQA, type SearchResult, type SearchResponse } from '@/src/lib/api';
+import { getStats, searchHotpotQA, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
 import type { SearchPreset } from '@/src/types';
 
 const SUGGESTIONS = [
@@ -9,38 +9,73 @@ const SUGGESTIONS = [
   'The Death of Cook depicts the death of James Cook at a bay on what coast?',
 ];
 
-const METHODS = [
-  { value: 'es_hybrid', label: 'Hybrid RRF (Vector + Keyword)' },
-  { value: 'es_bm25', label: 'Standard BM25 (Keyword Only)' },
-  { value: 'es_dense', label: 'Dense BGE (Vector Only)' },
-  { value: 'es_iterative_hybrid', label: 'Iterative Expansion (Multi-hop)' },
-];
+const METHOD_LABELS: Record<string, string> = {
+  tv_hybrid: 'TurboVec Hybrid RRF (Full Dense + BM25)',
+  tv_dense: 'TurboVec Dense (Vector Only)',
+  tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
+  es_bm25: 'Standard BM25 (Keyword Only)',
+};
+
+const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25'];
+
+function methodOptions(methods?: string[]) {
+  return (methods && methods.length ? methods : FALLBACK_METHODS).map((value) => ({
+    value,
+    label: METHOD_LABELS[value] ?? value,
+  }));
+}
 
 export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   const [query, setQuery] = useState(SUGGESTIONS[0]);
-  const [method, setMethod] = useState('es_bm25');
+  const [queryId, setQueryId] = useState<string | undefined>(undefined);
+  const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
+  const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastAutoRunKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    getStats()
+      .then((stats) => {
+        const methods = stats.methods?.length ? stats.methods : FALLBACK_METHODS;
+        setAvailableMethods(methods);
+        setMethod(methods.includes(stats.default_search_method ?? '') ? stats.default_search_method! : methods[0] ?? 'tv_hybrid');
+      })
+      .catch(() => {
+        setAvailableMethods(FALLBACK_METHODS);
+        setMethod('tv_hybrid');
+      });
+  }, []);
 
   useEffect(() => {
     if (!preset) return;
+    const nextMethod = availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid';
     setQuery(preset.query);
-    setMethod(preset.method);
+    setQueryId(preset.queryId);
+    setMethod(nextMethod);
     setTopK(preset.topK);
     setResponse(null);
     setError(null);
-  }, [preset]);
 
-  async function runSearch(nextQuery = query) {
+    if (preset.autoRun) {
+      const runKey = `${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
+      if (lastAutoRunKey.current !== runKey) {
+        lastAutoRunKey.current = runKey;
+        runSearch(preset.query, preset.queryId, nextMethod, preset.topK);
+      }
+    }
+  }, [availableMethods, preset]);
+
+  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchHotpotQA(trimmed, method, topK);
+      const payload = await searchHotpotQA(trimmed, nextMethod, nextTopK, nextQueryId);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -58,7 +93,10 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
             placeholder="Enter a complex retrieval query..."
             type="text"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setQueryId(undefined);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter') runSearch();
             }}
@@ -85,7 +123,8 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
               label={suggestion}
               onClick={() => {
                 setQuery(suggestion);
-                runSearch(suggestion);
+                setQueryId(undefined);
+                runSearch(suggestion, undefined);
               }}
             />
           ))}
@@ -98,7 +137,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
               onChange={(event) => setMethod(event.target.value)}
               className="w-full bg-white border border-outline-variant rounded-lg px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-primary outline-none appearance-none cursor-pointer font-mono tracking-tight"
             >
-              {METHODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {methodOptions(availableMethods).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             <UnfoldMore className="absolute right-3 top-[2.65rem] pointer-events-none text-on-surface-variant" size={16} />
           </ControlItem>
@@ -128,6 +167,8 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
       </section>
 
       <section className="space-y-4">
+        {response?.support && <SupportCoverage support={response.support} topK={response.top_k} />}
+
         <div className="flex items-center justify-between pb-3 border-b-4 border-outline-variant/20">
           <div className="flex items-center gap-4">
             <Verified className="text-primary" size={24} />
@@ -156,8 +197,9 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
           <div className="flex justify-center py-8">
             <button
               onClick={() => {
-                setTopK(Math.min(topK + 10, 50));
-                runSearch();
+                const nextTopK = Math.min(topK + 10, 50);
+                setTopK(nextTopK);
+                runSearch(query, queryId, method, nextTopK);
               }}
               className="flex items-center gap-3 px-10 py-3 border-2 border-primary text-primary rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary hover:text-on-primary transition-all group shadow-lg active:scale-[0.98]"
             >
@@ -188,6 +230,47 @@ function ControlItem({ label, children }: { label: string; children: ReactNode }
   );
 }
 
+function SupportCoverage({ support, topK }: { support: SearchSupportSummary; topK: number }) {
+  const recall = support.recall_at_k === null ? 'N/A' : support.recall_at_k.toFixed(3);
+  const missingPreview = support.missing_doc_ids.slice(0, 6);
+
+  return (
+    <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Gold Support</span>
+          {support.available ? (
+            <span className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded font-mono text-[10px] font-black uppercase tracking-widest">
+              Found {support.matched_count}/{support.total_count}
+            </span>
+          ) : (
+            <span className="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded font-mono text-[10px] font-black uppercase tracking-widest">
+              Unavailable
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Recall@{topK}</span>
+          <span className="font-headline text-xl font-extrabold text-on-surface">{recall}</span>
+        </div>
+      </div>
+      {support.available && support.missing_doc_ids.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-outline-variant/30 pt-3">
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">Missing</span>
+          {missingPreview.map((docId) => (
+            <span key={docId} className="px-2 py-1 bg-surface-container-low text-on-surface font-mono text-[10px] rounded border border-outline-variant/40 font-bold">
+              {docId}
+            </span>
+          ))}
+          {support.missing_doc_ids.length > missingPreview.length && (
+            <span className="font-mono text-[10px] text-on-surface-variant font-bold">+{support.missing_doc_ids.length - missingPreview.length}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({ result }: { key?: string; result: SearchResult }) {
   const isTop = result.rank === 1;
   return (
@@ -198,6 +281,7 @@ function ResultCard({ result }: { key?: string; result: SearchResult }) {
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <span className={cn('px-4 py-1.5 rounded font-mono text-[10px] font-black tracking-widest uppercase', isTop ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant')}>RANK {result.rank}</span>
+          {result.is_support && <span className="px-4 py-1.5 rounded font-mono text-[10px] font-black tracking-widest uppercase bg-primary/10 text-primary border border-primary/20">Support Hit</span>}
           <span className="px-4 py-1.5 bg-surface-container-high text-on-surface-variant rounded font-mono text-[10px] font-black tracking-widest uppercase">HOP {result.hop}</span>
           <span className="ml-auto font-mono text-[10px] text-on-surface-variant font-bold opacity-40">UID: {result.doc_id}</span>
           <div className={cn('flex items-center gap-2 font-mono text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest', isTop ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface')}>
