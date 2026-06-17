@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import csv
 import hashlib
@@ -10,7 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,9 @@ from src.retrieval.turbovec_retriever import TurboVecHybridRetriever
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 QUERY_EXAMPLES_PATH = ROOT_DIR / "evaluation" / "results" / "hotpotqa_full_dev_queries.tsv"
-BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
+FULL_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "hotpotqa_full" / "tv_full_200.json"
+FILTERED_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "hotpotqa_full" / "tv_filtered_full_200.json"
+LEGACY_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
 ES_METHODS = {"es_bm25"}
 TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
@@ -215,8 +217,47 @@ def load_dataset_query_examples(dataset_id: str = settings.dataset_id) -> list[d
     return build_query_examples(dataset.queries_iter(), dataset.qrels_iter())
 
 
-def load_benchmark_result(path: Path = BENCHMARK_RESULT_PATH) -> dict[str, Any]:
+def load_benchmark_result(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def build_benchmark_dashboard(full_result: dict[str, Any], filtered_result: dict[str, Any], legacy_result: dict[str, Any]) -> dict[str, Any]:
+    current_order = ["es_bm25", "tv_dense", "tv_filtered_hybrid", "tv_hybrid"]
+    rows_by_method = {
+        str(row.get("method", "")): row
+        for row in [*full_result.get("results", []), *filtered_result.get("results", [])]
+    }
+    current_results = [rows_by_method[method] for method in current_order if method in rows_by_method]
+    full_config = dict(full_result.get("config", {}))
+    filtered_config = dict(filtered_result.get("config", {}))
+    current_config = {
+        **full_config,
+        "methods": [row.get("method") for row in current_results],
+        "queries": int(full_config.get("queries") or full_config.get("max_queries") or 0),
+        "corpus_doc_count": 5233329,
+        "project_stage": "Sprint 3 full-corpus pilot",
+        "benchmark_scope": "Full HotpotQA corpus with a 200-query dev pilot run",
+        "paper_comparable": False,
+        "paper_protocol": "Run full beir/hotpotqa/test with 7,405 queries for BEIR/paper comparison.",
+    }
+    if filtered_config.get("candidate_k") is not None:
+        current_config["filtered_candidate_k"] = filtered_config.get("candidate_k")
+
+    return {
+        "current": {
+            "title": "Current Full-Corpus Benchmark",
+            "subtitle": "Project-progress snapshot on full HotpotQA corpus; not a paper-comparable full test run yet.",
+            "config": current_config,
+            "results": current_results,
+        },
+        "legacy": {
+            "title": "Legacy Nano / Elasticsearch Benchmarks",
+            "subtitle": "Earlier small-corpus Elasticsearch history kept for project context only.",
+            "config": legacy_result.get("config", {}),
+            "results": legacy_result.get("results", []),
+        },
+        "results": current_results,
+    }
 
 
 @lru_cache(maxsize=1)
@@ -229,7 +270,11 @@ def get_query_examples() -> list[dict[str, Any]]:
 
 @lru_cache(maxsize=1)
 def get_benchmark_result() -> dict[str, Any]:
-    return load_benchmark_result()
+    return build_benchmark_dashboard(
+        load_benchmark_result(FULL_BENCHMARK_RESULT_PATH),
+        load_benchmark_result(FILTERED_BENCHMARK_RESULT_PATH),
+        load_benchmark_result(LEGACY_BENCHMARK_RESULT_PATH),
+    )
 
 
 def warm_embedding_model() -> None:
@@ -300,10 +345,37 @@ def stats() -> dict[str, Any]:
     }
 
 
+def query_row_matches(row: dict[str, Any], search: str) -> bool:
+    value = search.strip().lower()
+    if not value:
+        return True
+    query_id = str(row.get("query_id", "")).lower()
+    query_text = str(row.get("query", "")).lower()
+    support_doc_ids = [str(doc_id).lower() for doc_id in row.get("support_doc_ids", [])]
+    return value in query_id or value in query_text or any(value in doc_id for doc_id in support_doc_ids)
+
+
+def paginate_query_examples(rows: list[dict[str, Any]], limit: int = 10, offset: int = 0, search: str = "") -> dict[str, Any]:
+    bounded_limit = max(1, min(int(limit), 100))
+    bounded_offset = max(0, int(offset))
+    filtered_rows = [row for row in rows if query_row_matches(row, search)]
+    page_rows = filtered_rows[bounded_offset : bounded_offset + bounded_limit]
+    return {
+        "count": len(page_rows),
+        "total": len(filtered_rows),
+        "limit": bounded_limit,
+        "offset": bounded_offset,
+        "queries": page_rows,
+    }
+
+
 @app.get("/queries")
-def queries() -> dict[str, Any]:
-    rows = get_query_examples()
-    return {"count": len(rows), "queries": rows}
+def queries(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: str = "",
+) -> dict[str, Any]:
+    return paginate_query_examples(get_query_examples(), limit=limit, offset=offset, search=search)
 
 
 @app.get("/benchmark")
@@ -409,5 +481,3 @@ def search(request: SearchRequest) -> dict[str, Any]:
         support_doc_ids=support_doc_ids,
     )
     return response
-
-

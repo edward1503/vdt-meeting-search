@@ -1,47 +1,75 @@
 import { DescriptionIcon, Hub, Bolt, Route, ExportNotes, Search, MoreVert } from '@/src/components/Icons';
-import { useEffect, useMemo, useState } from 'react';
-import { Query } from '@/src/types';
+import { useEffect, useState } from 'react';
+import type { Query, SearchPreset } from '@/src/types';
 import { cn } from '@/src/lib/utils';
-import { getQueries, searchHotpotQA } from '@/src/lib/api';
+import { getQueries } from '@/src/lib/api';
 
-export function QueriesView() {
+const PAGE_SIZE = 10;
+
+interface QueriesViewProps {
+  onSearchQuery: (preset: SearchPreset) => void;
+}
+
+export function QueriesView({ onSearchQuery }: QueriesViewProps) {
   const [queries, setQueries] = useState<Query[]>([]);
   const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
   const [filter, setFilter] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [runState, setRunState] = useState<string | null>(null);
 
   useEffect(() => {
-    getQueries()
-      .then((rows) => {
-        setQueries(rows);
-        setSelectedQuery(rows[0] ?? null);
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+
+    getQueries({ limit: PAGE_SIZE, offset, search: filter })
+      .then((page) => {
+        if (cancelled) return;
+        setQueries(page.queries);
+        setTotal(page.total);
+        setSelectedQuery((current) => page.queries.find((query) => query.id === current?.id) ?? page.queries[0] ?? null);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load queries'))
-      .finally(() => setIsLoading(false));
-  }, []);
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Could not load queries');
+        setQueries([]);
+        setSelectedQuery(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-  const filteredQueries = useMemo(() => {
-    const value = filter.trim().toLowerCase();
-    if (!value) return queries;
-    return queries.filter((query) =>
-      query.id.toLowerCase().includes(value) ||
-      query.text.toLowerCase().includes(value) ||
-      query.docs.some((doc) => doc.toLowerCase().includes(value))
-    );
-  }, [filter, queries]);
+    return () => {
+      cancelled = true;
+    };
+  }, [filter, offset]);
 
-  async function runSelectedSearch(method = 'tv_hybrid') {
+  const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const firstVisible = total === 0 ? 0 : offset + 1;
+  const lastVisible = Math.min(offset + queries.length, total);
+  const canGoPrevious = offset > 0;
+  const canGoNext = offset + queries.length < total;
+
+  function updateFilter(value: string) {
+    setFilter(value);
+    setOffset(0);
+  }
+
+  function handoffSelectedSearch(method = 'tv_hybrid') {
     if (!selectedQuery) return;
-    setRunState('Running search...');
-    try {
-      const result = await searchHotpotQA(selectedQuery.text, method, 10, selectedQuery.id);
-      const supportText = result.support?.available ? ` · support ${result.support.matched_count}/${result.support.total_count}` : '';
-      setRunState(`Retrieved ${result.results.length} docs in ${Math.round(result.latency_ms)}ms${supportText}`);
-    } catch (err) {
-      setRunState(err instanceof Error ? err.message : 'Search failed');
-    }
+    const preset: SearchPreset = {
+      id: Date.now(),
+      queryId: selectedQuery.id,
+      query: selectedQuery.text,
+      method,
+      topK: 10,
+      autoRun: true,
+    };
+    onSearchQuery(preset);
   }
 
   return (
@@ -52,25 +80,28 @@ export function QueriesView() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-outline" size={18} />
             <input
               value={filter}
-              onChange={(event) => setFilter(event.target.value)}
+              onChange={(event) => updateFilter(event.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-surface-container-low border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all font-sans text-on-surface outline-none placeholder:text-outline"
               placeholder="Filter query text or doc id..."
               type="text"
             />
           </div>
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-4 gap-4">
             <div className="flex space-x-2">
-              <FilterChip label="ALL QUERIES" active />
-              <FilterChip label="PROCESSED" />
+              <FilterChip label="FULL DEV" active />
+              <FilterChip label="10 / PAGE" />
             </div>
-            <span className="font-mono text-[10px] text-outline uppercase tracking-widest font-bold">Showing {filteredQueries.length} of {queries.length}</span>
+            <span className="font-mono text-[10px] text-outline uppercase tracking-widest font-bold">
+              Showing {firstVisible}-{lastVisible} of {total}
+            </span>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {error && <div className="p-8 text-primary font-bold">{error}</div>}
           {isLoading && <div className="p-8 text-on-surface-variant font-bold">Loading queries...</div>}
-          {!isLoading && !error && (
+          {!isLoading && !error && queries.length === 0 && <div className="p-8 text-on-surface-variant font-bold">No matching queries.</div>}
+          {!isLoading && !error && queries.length > 0 && (
             <table className="w-full border-collapse text-left">
               <thead className="sticky top-0 bg-white border-b border-outline-variant z-10">
                 <tr>
@@ -80,7 +111,7 @@ export function QueriesView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10">
-                {filteredQueries.map((q) => (
+                {queries.map((q) => (
                   <tr
                     key={q.id}
                     onClick={() => setSelectedQuery(q)}
@@ -103,49 +134,71 @@ export function QueriesView() {
             </table>
           )}
         </div>
+
+        <div className="border-t border-outline-variant bg-white px-8 py-4 flex items-center justify-between gap-4">
+          <div className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest font-bold">
+            Page {pageNumber} / {pageCount}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+              disabled={!canGoPrevious || isLoading}
+              className="h-9 px-4 border border-outline-variant rounded-lg font-bold text-xs uppercase tracking-widest hover:bg-surface-container-low disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => setOffset(offset + PAGE_SIZE)}
+              disabled={!canGoNext || isLoading}
+              className="h-9 px-4 bg-primary text-on-primary rounded-lg font-bold text-xs uppercase tracking-widest hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </section>
 
-      <aside className="w-[500px] bg-white flex flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.04)] z-10">
-        <div className="p-8 border-b border-outline-variant flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Bolt className="text-primary" size={20} />
-            <h2 className="font-headline text-xl font-bold text-on-surface">Query Preview</h2>
+      <aside className="w-[clamp(360px,34vw,500px)] bg-white flex flex-col shadow-[-4px_0_24px_rgba(0,0,0,0.04)] z-10">
+        <div className="px-6 py-5 border-b border-outline-variant flex items-center justify-between">
+          <div className="flex items-center space-x-2 min-w-0">
+            <Bolt className="text-primary shrink-0" size={20} />
+            <h2 className="font-headline text-xl font-bold text-on-surface truncate">Query Preview</h2>
           </div>
-          <button className="p-2 hover:bg-surface-container-low rounded-full transition-colors">
+          <button className="p-2 hover:bg-surface-container-low rounded-full transition-colors shrink-0">
             <MoreVert size={20} />
           </button>
         </div>
 
         {selectedQuery ? (
-          <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-10">
-            <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-8">
+            <div className="space-y-3">
               <span className="font-label text-[10px] text-outline uppercase tracking-[0.2em] font-bold">Metadata</span>
-              <div className="flex items-center space-x-2">
-                <div className="font-mono text-2xl text-primary font-bold">{selectedQuery.id}</div>
-                <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[9px] rounded font-bold uppercase">HOTPOTQA</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="font-mono text-xl text-primary font-bold truncate">{selectedQuery.id}</div>
+                <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[9px] rounded font-bold uppercase shrink-0">HOTPOTQA</span>
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <span className="font-label text-[10px] text-outline uppercase tracking-[0.2em] font-bold">Natural Language Query</span>
-              <div className="bg-surface-container-low p-6 rounded-xl border-l-[6px] border-primary">
-                <p className="text-lg text-on-surface leading-relaxed italic font-medium">{selectedQuery.text}</p>
+              <div className="bg-surface-container-low p-5 rounded-lg border-l-[5px] border-primary">
+                <p className="text-base text-on-surface leading-relaxed italic font-medium">{selectedQuery.text}</p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
                 <span className="font-label text-[10px] text-outline uppercase tracking-[0.2em] font-bold">Gold Documents</span>
-                <span className="font-mono text-[10px] bg-primary/10 px-2 py-0.5 rounded text-primary font-bold uppercase">{selectedQuery.docs.length} DOCS</span>
+                <span className="font-mono text-[10px] bg-primary/10 px-2 py-0.5 rounded text-primary font-bold uppercase shrink-0">{selectedQuery.docs.length} Docs</span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {selectedQuery.docs.map((doc) => (
-                  <div key={doc} className="flex items-start space-x-4 p-4 bg-white border border-outline-variant rounded-xl hover:border-primary/40 transition-all cursor-pointer">
+                  <div key={doc} className="flex items-start space-x-3 p-3 bg-white border border-outline-variant rounded-lg hover:border-primary/40 transition-all cursor-pointer">
                     <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center shrink-0">
                       <DescriptionIcon className="text-primary" size={16} />
                     </div>
-                    <div>
-                      <p className="font-mono text-sm font-bold text-on-surface">{doc}</p>
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-bold text-on-surface break-all">{doc}</p>
                       <p className="text-xs text-on-surface-variant mt-1 leading-relaxed line-clamp-2">Gold support document from HotpotQA qrels.</p>
                     </div>
                   </div>
@@ -153,13 +206,13 @@ export function QueriesView() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <span className="font-label text-[10px] text-outline uppercase tracking-[0.2em] font-bold">Retrieved Context Map</span>
-              <div className="bg-surface-container-high rounded-xl h-48 relative overflow-hidden flex items-center justify-center border border-outline-variant/30">
+              <div className="bg-surface-container-high rounded-lg h-36 relative overflow-hidden flex items-center justify-center border border-outline-variant/30">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent opacity-50" />
-                <div className="relative z-10 flex flex-col items-center">
-                  <Hub className="text-primary/40 mb-2" size={40} />
-                  <span className="font-mono text-[9px] font-bold text-primary tracking-[0.25em] uppercase">2-Hop Knowledge Graph View</span>
+                <div className="relative z-10 flex flex-col items-center text-center px-4">
+                  <Hub className="text-primary/40 mb-2" size={32} />
+                  <span className="font-mono text-[9px] font-bold text-primary tracking-[0.2em] uppercase">2-Hop Knowledge Graph View</span>
                 </div>
               </div>
             </div>
@@ -168,15 +221,12 @@ export function QueriesView() {
           <div className="flex-1 p-8 text-on-surface-variant font-bold">No query selected.</div>
         )}
 
-        <div className="p-8 border-t border-outline-variant bg-white space-y-3 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
-          {runState && <div className="text-xs font-mono text-primary font-bold uppercase tracking-widest">{runState}</div>}
-          <button onClick={() => runSelectedSearch('tv_hybrid')} className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold flex items-center justify-center space-x-3 hover:bg-primary/95 transition-all shadow-md active:scale-[0.98]">
-            <Bolt size={20} />
-            <span className="font-label text-xs tracking-[0.2em] uppercase">Run TurboVec Hybrid</span>
-          </button>
-          <div className="grid grid-cols-2 gap-3">
-            <ActionButton Icon={Route} label="BM25" onClick={() => runSelectedSearch('es_bm25')} />
-            <ActionButton Icon={ExportNotes} label="Export" onClick={() => setRunState('Export uses the loaded API query set.')} />
+        <div className="p-4 border-t border-outline-variant bg-white space-y-2 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
+          {runState && <div className="text-[10px] font-mono text-primary font-bold uppercase tracking-widest truncate">{runState}</div>}
+          <div className="grid grid-cols-3 gap-2">
+            <CompactActionButton Icon={Bolt} label="Run Hybrid" primary onClick={() => handoffSelectedSearch('tv_hybrid')} />
+            <CompactActionButton Icon={Route} label="BM25" onClick={() => handoffSelectedSearch('es_bm25')} />
+            <CompactActionButton Icon={ExportNotes} label="Export" onClick={() => setRunState('Export uses current query page.')} />
           </div>
         </div>
       </aside>
@@ -186,17 +236,23 @@ export function QueriesView() {
 
 function FilterChip({ label, active }: { label: string; active?: boolean }) {
   return (
-    <button className={cn('px-4 py-1.5 font-label text-[10px] rounded-full transition-colors font-bold tracking-widest uppercase', active ? 'bg-primary text-on-primary' : 'bg-white text-on-surface-variant border border-outline-variant hover:bg-surface-container-low')}>
+    <button className={cn('px-3 py-1.5 font-label text-[10px] rounded-full transition-colors font-bold tracking-widest uppercase', active ? 'bg-primary text-on-primary' : 'bg-white text-on-surface-variant border border-outline-variant hover:bg-surface-container-low')}>
       {label}
     </button>
   );
 }
 
-function ActionButton({ Icon, label, onClick }: { Icon: any; label: string; onClick: () => void }) {
+function CompactActionButton({ Icon, label, onClick, primary }: { Icon: any; label: string; onClick: () => void; primary?: boolean }) {
   return (
-    <button onClick={onClick} className="py-3 bg-white border border-outline text-on-surface font-bold rounded-lg flex items-center justify-center space-x-2 hover:bg-surface-container-low transition-all text-xs uppercase tracking-widest">
-      <Icon size={14} />
-      <span>{label}</span>
+    <button
+      onClick={onClick}
+      className={cn(
+        'h-10 min-w-0 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all text-[10px] uppercase tracking-widest active:scale-[0.98] px-2',
+        primary ? 'bg-primary text-on-primary hover:bg-primary/95 shadow-sm' : 'bg-white border border-outline text-on-surface hover:bg-surface-container-low'
+      )}
+    >
+      <Icon size={14} className="shrink-0" />
+      <span className="truncate">{label}</span>
     </button>
   );
 }

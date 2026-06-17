@@ -75,6 +75,25 @@ def test_build_query_examples_joins_queries_and_qrels():
     ]
 
 
+def test_queries_endpoint_paginates_and_filters(monkeypatch):
+    from src.api import main
+
+    rows = [
+        {"query_id": "q1", "query": "Alpha bridge question", "support_doc_ids": ["d1"], "support_doc_count": 1},
+        {"query_id": "q2", "query": "Beta unrelated", "support_doc_ids": ["d2"], "support_doc_count": 1},
+        {"query_id": "q3", "query": "Gamma alpha support", "support_doc_ids": ["d3"], "support_doc_count": 1},
+    ]
+    monkeypatch.setattr(main, "get_query_examples", lambda: rows)
+
+    payload = main.queries(limit=1, offset=1, search="alpha")
+
+    assert payload == {
+        "count": 1,
+        "total": 2,
+        "limit": 1,
+        "offset": 1,
+        "queries": [rows[2]],
+    }
 def test_find_support_doc_ids_prefers_query_id(monkeypatch):
     from src.api import main
 
@@ -103,6 +122,32 @@ def test_load_benchmark_result_reads_json(tmp_path):
     }
 
 
+def test_build_benchmark_dashboard_combines_current_and_legacy_results():
+    from src.api import main
+
+    full = {
+        "config": {"dataset_id": "beir/hotpotqa/dev", "index": "hotpotqa_full_bm25_v1", "top_k": 10, "queries": 200, "methods": ["es_bm25", "tv_dense", "tv_hybrid"]},
+        "results": [
+            {"method": "es_bm25", "metrics": {"recall@10": 0.6, "latency_p50_ms": 100, "queries": 200}},
+            {"method": "tv_dense", "metrics": {"recall@10": 0.72, "latency_p50_ms": 500, "queries": 200}},
+            {"method": "tv_hybrid", "metrics": {"recall@10": 0.75, "latency_p50_ms": 1000, "queries": 200}},
+        ],
+    }
+    filtered = {
+        "config": {"dataset_id": "beir/hotpotqa/dev", "index": "hotpotqa_full_bm25_v1", "top_k": 10, "queries": 200, "methods": ["tv_filtered_hybrid"]},
+        "results": [{"method": "tv_filtered_hybrid", "metrics": {"recall@10": 0.68, "latency_p50_ms": 277, "queries": 200}}],
+    }
+    legacy = {"config": {"dataset_id": "nano-beir/hotpotqa", "queries": 50}, "results": [{"method": "es_hybrid", "metrics": {"recall@10": 0.91}}]}
+
+    payload = main.build_benchmark_dashboard(full, filtered, legacy)
+
+    assert [row["method"] for row in payload["current"]["results"]] == ["es_bm25", "tv_dense", "tv_filtered_hybrid", "tv_hybrid"]
+    assert payload["current"]["config"]["project_stage"] == "Sprint 3 full-corpus pilot"
+    assert payload["current"]["config"]["corpus_doc_count"] == 5233329
+    assert payload["current"]["config"]["paper_comparable"] is False
+    assert payload["legacy"]["title"] == "Legacy Nano / Elasticsearch Benchmarks"
+    assert payload["legacy"]["results"] == legacy["results"]
+    assert payload["results"] == payload["current"]["results"]
 def test_api_exposes_turbovec_methods_and_settings():
     from src.api import main
 

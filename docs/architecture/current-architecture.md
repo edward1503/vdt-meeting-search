@@ -1,4 +1,4 @@
-﻿# Current Architecture
+# Current Architecture
 
 Last updated: 2026-06-16
 
@@ -144,7 +144,7 @@ Important CLI inputs:
 
 Outputs are written to `evaluation/results/*.json` and `evaluation/runs/**/*.trec`.
 
-Metrics are computed in `src/evaluation/metrics.py`: `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency p50/p95/p99, and QPS.
+Metrics are computed in `src/evaluation/metrics.py`: `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency p50/p95/p99, and QPS. The dashboard surfaces the current 200-query full-corpus dev benchmark as project progress and keeps legacy nano benchmarks below it; paper-comparable claims should use the full `beir/hotpotqa/test` split.
 
 `full_support_recall@k` is important for HotpotQA because many queries need all supporting documents, not just one relevant hit.
 
@@ -157,7 +157,7 @@ The FastAPI app is in `src/api/main.py`.
 | `/health` | GET | Health check |
 | `/stats` | GET | Runtime config: backend, index, dataset, model, cache, history path |
 | `/queries` | GET | Query examples and support docs from `ir_datasets` or TSV fallback |
-| `/benchmark` | GET | Benchmark JSON artifact |
+| `/benchmark` | GET | Benchmark dashboard payload with current full-corpus project-progress results plus legacy nano history |
 | `/search` | POST | Run BM25/TurboVec retrieval and return support coverage metadata |
 | `/history` | GET | List search history |
 | `/history/{id}` | GET | Return one search history entry |

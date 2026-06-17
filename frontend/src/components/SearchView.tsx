@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
 import { getStats, searchHotpotQA, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
@@ -34,6 +34,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastAutoRunKey = useRef<string | null>(null);
 
   useEffect(() => {
     getStats()
@@ -50,22 +51,31 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
 
   useEffect(() => {
     if (!preset) return;
+    const nextMethod = availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid';
     setQuery(preset.query);
     setQueryId(preset.queryId);
-    setMethod(availableMethods.includes(preset.method) ? preset.method : availableMethods[0] ?? 'tv_hybrid');
+    setMethod(nextMethod);
     setTopK(preset.topK);
     setResponse(null);
     setError(null);
+
+    if (preset.autoRun) {
+      const runKey = `${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
+      if (lastAutoRunKey.current !== runKey) {
+        lastAutoRunKey.current = runKey;
+        runSearch(preset.query, preset.queryId, nextMethod, preset.topK);
+      }
+    }
   }, [availableMethods, preset]);
 
-  async function runSearch(nextQuery = query, nextQueryId = queryId) {
+  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
 
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchHotpotQA(trimmed, method, topK, nextQueryId);
+      const payload = await searchHotpotQA(trimmed, nextMethod, nextTopK, nextQueryId);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -187,8 +197,9 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
           <div className="flex justify-center py-8">
             <button
               onClick={() => {
-                setTopK(Math.min(topK + 10, 50));
-                runSearch();
+                const nextTopK = Math.min(topK + 10, 50);
+                setTopK(nextTopK);
+                runSearch(query, queryId, method, nextTopK);
               }}
               className="flex items-center gap-3 px-10 py-3 border-2 border-primary text-primary rounded-full font-black uppercase tracking-widest text-xs hover:bg-primary hover:text-on-primary transition-all group shadow-lg active:scale-[0.98]"
             >

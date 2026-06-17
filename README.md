@@ -33,7 +33,7 @@ python scripts/es_hotpotqa.py validate --index hotpotqa_full_bm25_current --expe
 python -m src.evaluation.benchmark_es --dataset beir/hotpotqa/dev --index hotpotqa_full_bm25_current --methods es_bm25,tv_dense,tv_hybrid --top-k 10 --max-queries 200 --candidate-k 50 --num-candidates 50 --rrf-k 30 --output evaluation/results/hotpotqa_full/tv_full_200.json --run-dir evaluation/runs/hotpotqa_full
 ```
 
-The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency percentiles, and QPS.
+The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_support_recall@k`, latency percentiles, and QPS. The dashboard benchmark page now treats the full-corpus 200-query dev run as a project-progress pilot for `es_bm25`, `tv_dense`, `tv_filtered_hybrid`, and `tv_hybrid`, with legacy nano/Elasticsearch results shown separately. Use the full `beir/hotpotqa/test` split with 7,405 queries before making BEIR/paper-comparable claims.
 
 ## Docker Development Stack
 
@@ -82,4 +82,4 @@ Open `http://localhost:3001`.
 
 ## Query Set
 
-The dashboard query browser uses `beir/hotpotqa/dev` and the checked-in fallback file `evaluation/results/hotpotqa_full_dev_queries.tsv`. This keeps Docker runtime on the full HotpotQA profile even though the API image intentionally does not install `ir_datasets`.
+The dashboard query browser uses `beir/hotpotqa/dev` and the checked-in fallback file `evaluation/results/hotpotqa_full_dev_queries.tsv`. The `/queries` API is paginated with `limit`, `offset`, and `search` parameters, and the frontend defaults to 10 queries per page so Docker runtime stays on the full HotpotQA profile without loading the whole query set into the browser.
