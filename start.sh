@@ -11,6 +11,7 @@ EMBEDDING_DEVICE=${EMBEDDING_DEVICE:-cuda}
 EMBEDDING_HEALTH_URL="http://127.0.0.1:${EMBEDDING_PORT}/health"
 EMBEDDING_EMBED_URL="http://127.0.0.1:${EMBEDDING_PORT}/embed"
 API_BASE_URL=${API_BASE_URL:-http://127.0.0.1:8001}
+COMPOSE_SERVICES="elasticsearch redis api frontend"
 PID_FILE=".runtime/embedding_server.pid"
 STDOUT_LOG="logs/embedding_server.stdout.log"
 STDERR_LOG="logs/embedding_server.stderr.log"
@@ -154,6 +155,24 @@ print(f"{method} results={len(results)}")
 PY
 }
 
+missing_compose_services() {
+  existing_services=$(docker compose ps --all --services 2>/dev/null || true)
+  missing=""
+  for service in $COMPOSE_SERVICES; do
+    found=0
+    for existing in $existing_services; do
+      if [ "$existing" = "$service" ]; then
+        found=1
+        break
+      fi
+    done
+    if [ "$found" -eq 0 ]; then
+      missing="$missing $service"
+    fi
+  done
+  printf '%s' "${missing# }"
+}
+
 require_command docker
 require_command "$PYTHON_BIN"
 require_command nvidia-smi
@@ -206,8 +225,14 @@ warm_embedding_model "" 384 "what connects alpha and beta"
 log "Warming VimQA embedding model"
 warm_embedding_model "vimqa" 768 "xin chao"
 
-log "Starting Docker Compose services"
-docker compose up -d --build elasticsearch redis api frontend
+missing_services=$(missing_compose_services)
+if [ -n "$missing_services" ]; then
+  log "Missing Docker Compose containers:$missing_services; building services"
+  docker compose up -d --build $COMPOSE_SERVICES
+else
+  log "Docker Compose containers already exist; starting without rebuild"
+  docker compose up -d $COMPOSE_SERVICES
+fi
 
 log "Checking API container can reach host embedding service"
 docker compose exec -T api python -c "import json, urllib.request; print(json.load(urllib.request.urlopen('http://host.docker.internal:${EMBEDDING_PORT}/health', timeout=5))['status'])"
