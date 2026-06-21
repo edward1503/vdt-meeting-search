@@ -9,6 +9,7 @@ import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib import request as urlrequest
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,6 +45,18 @@ def embedding_service_url_for_profile(profile: DatasetProfile) -> str:
 
 def embedding_model_id_for_profile(profile: DatasetProfile) -> str:
     return "" if profile.id == "hotpotqa" else profile.id
+
+def embedding_health_url(service_url: str) -> str:
+    base = service_url.rstrip("/")
+    if base.endswith("/embed"):
+        base = base[:-len("/embed")]
+    return f"{base}/health" if base else ""
+
+def normalize_loaded_dim(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 def build_search_cache_key(
     *,
@@ -480,6 +493,51 @@ def dataset_stats(dataset_id: str) -> dict[str, Any]:
         "corpus_doc_count": infer_corpus_doc_count(profile.index) or (3623 if profile.id == "vimqa" else None),
         "primary_metric": profile.primary_metric,
     }
+
+
+@app.get("/datasets/{dataset_id}/embedding-health")
+def dataset_embedding_health(dataset_id: str) -> dict[str, Any]:
+    profile = resolve_dataset_profile(dataset_id)
+    service_url = embedding_service_url_for_profile(profile)
+    model_id = embedding_model_id_for_profile(profile) or "hotpotqa"
+    expected_dim = profile.vector_dims
+    payload: dict[str, Any] = {
+        "dataset_id": profile.id,
+        "model_id": model_id,
+        "model": profile.embedding_model,
+        "expected_dim": expected_dim,
+        "loaded_dim": None,
+        "status": "not_configured",
+        "service_url": service_url,
+        "device": None,
+        "torch_cuda_available": False,
+        "loaded_models": {},
+    }
+    health_url = embedding_health_url(service_url)
+    if not health_url:
+        return payload
+
+    try:
+        timeout = min(settings.embedding_timeout_seconds, 5)
+        with urlrequest.urlopen(health_url, timeout=timeout) as response:
+            service_health = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        payload["status"] = "offline"
+        payload["error"] = str(exc)
+        return payload
+
+    loaded_models = service_health.get("loaded_models") or {}
+    loaded_dim = normalize_loaded_dim(loaded_models.get(model_id))
+    payload.update(
+        {
+            "status": "ready" if expected_dim is not None and loaded_dim == expected_dim else "warming",
+            "loaded_dim": loaded_dim,
+            "device": service_health.get("device"),
+            "torch_cuda_available": bool(service_health.get("torch_cuda_available")),
+            "loaded_models": loaded_models,
+        }
+    )
+    return payload
 
 
 @app.get("/datasets/{dataset_id}/queries")

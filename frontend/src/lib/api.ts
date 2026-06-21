@@ -92,6 +92,20 @@ export interface StatsResponse {
   corpus_doc_count?: number | null;
 }
 
+export interface EmbeddingHealthResponse {
+  dataset_id: string;
+  model_id: string;
+  model: string;
+  expected_dim: number | null;
+  loaded_dim: number | null;
+  status: 'ready' | 'warming' | 'offline' | 'not_configured';
+  service_url: string;
+  device?: string | null;
+  torch_cuda_available?: boolean;
+  loaded_models?: Record<string, number>;
+  error?: string;
+}
+
 interface ApiQuery {
   query_id: string;
   query: string;
@@ -167,6 +181,10 @@ export async function getDatasets(): Promise<DatasetListResponse> {
 
 export async function getDatasetStats(datasetId: string): Promise<StatsResponse> {
   return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/stats`);
+}
+
+export async function getDatasetEmbeddingHealth(datasetId: string): Promise<EmbeddingHealthResponse> {
+  return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/embedding-health`);
 }
 
 export async function getDatasetQueries(datasetId: string, { limit = 10, offset = 0, search = '' }: { limit?: number; offset?: number; search?: string } = {}): Promise<QueryPage> {

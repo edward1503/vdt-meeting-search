@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CloudDone, Database, Storage, Memory, Hub, DescriptionIcon, Dataset, Lan, Info } from '@/src/components/Icons';
-import { getDatasetStats, getHealth, type StatsResponse } from '@/src/lib/api';
+import { getDatasetEmbeddingHealth, getDatasetStats, getHealth, type EmbeddingHealthResponse, type StatsResponse } from '@/src/lib/api';
 import type { DatasetProfile } from '@/src/types';
 
 function formatDocCount(count?: number | null) {
@@ -12,9 +12,21 @@ function runtimeProfileLabel(profile?: string) {
   return profile ? profile.toUpperCase() : 'UNKNOWN';
 }
 
+function embeddingHealthBadge(health: EmbeddingHealthResponse | null) {
+  return health?.status.replace('_', ' ').toUpperCase() ?? 'CHECKING';
+}
+
+function embeddingHealthValue(health: EmbeddingHealthResponse | null, stats: StatsResponse | null, dataset: DatasetProfile | null) {
+  if (!health) return stats?.embedding_model ?? dataset?.embedding_model ?? 'checking';
+  const loaded = health.loaded_dim ?? 'pending';
+  const expected = health.expected_dim ?? 'unknown';
+  return `${health.model_id}:${loaded}/${expected}`;
+}
+
 export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile | null; datasetError?: string | null }) {
   const [health, setHealth] = useState('checking');
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [embeddingHealth, setEmbeddingHealth] = useState<EmbeddingHealthResponse | null>(null);
 
   useEffect(() => {
     getHealth()
@@ -24,9 +36,22 @@ export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile 
 
   useEffect(() => {
     if (!dataset) return;
+    setEmbeddingHealth(null);
     getDatasetStats(dataset.id)
       .then(setStats)
       .catch(() => setStats(null));
+    getDatasetEmbeddingHealth(dataset.id)
+      .then(setEmbeddingHealth)
+      .catch(() => setEmbeddingHealth({
+        dataset_id: dataset.id,
+        model_id: dataset.id === 'hotpotqa' ? 'hotpotqa' : dataset.id,
+        model: dataset.embedding_model,
+        expected_dim: dataset.vector_dims,
+        loaded_dim: null,
+        status: 'offline',
+        service_url: '',
+        error: 'Embedding health check failed',
+      }));
   }, [dataset?.id]);
 
   return (
@@ -52,6 +77,14 @@ export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile 
             <StatusRow Icon={CloudDone} label="API SERVICE" badge={health.toUpperCase()} isPrimary={health === 'ok'} />
             <StatusRow Icon={Database} label="BACKEND" value={stats?.backend ?? 'checking'} status={stats ? 'CONFIGURED' : 'WAITING'} />
             <StatusRow Icon={Storage} label="ACTIVE INDEX" chip={stats?.index ?? 'unknown'} />
+            <StatusRow
+              Icon={Memory}
+              label="EMBEDDING MODEL"
+              value={embeddingHealthValue(embeddingHealth, stats, dataset)}
+              badge={embeddingHealthBadge(embeddingHealth)}
+              badgeTone={embeddingHealth?.status ?? 'checking'}
+              isPrimary={embeddingHealth?.status === 'ready'}
+            />
           </div>
         </section>
 
@@ -103,7 +136,12 @@ export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile 
   );
 }
 
-function StatusRow({ Icon, label, value, status, chip, badge, isPrimary }: any) {
+function StatusRow({ Icon, label, value, status, chip, badge, badgeTone, isPrimary }: any) {
+  const badgeClassName = badgeTone === 'ready' || badgeTone === 'ok'
+    ? 'bg-primary text-on-primary shadow-primary/20'
+    : badgeTone === 'offline'
+      ? 'bg-on-background text-surface shadow-on-background/10'
+      : 'bg-surface-container-high text-on-surface border border-outline-variant shadow-outline/10';
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-surface-container-low rounded-lg border border-outline-variant/30">
       <div className="flex items-center space-x-4 min-w-0">
@@ -114,7 +152,7 @@ function StatusRow({ Icon, label, value, status, chip, badge, isPrimary }: any) 
         {value && <span className="font-mono text-xs text-on-surface bg-white px-3 py-1 rounded shadow-sm font-bold uppercase tracking-widest truncate max-w-56">{value}</span>}
         {status && <span className="font-mono text-xs text-primary font-bold border-l border-outline-variant pl-3 tracking-widest">{status}</span>}
         {chip && <span className="font-mono text-xs bg-primary/10 text-primary px-4 py-1.5 rounded-lg font-bold uppercase tracking-widest border border-primary/20 truncate max-w-64">{chip}</span>}
-        {badge && <span className="bg-primary text-on-primary px-4 py-1.5 rounded font-mono text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg shadow-primary/20">{badge}</span>}
+        {badge && <span className={`px-4 py-1.5 rounded font-mono text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg ${badgeClassName}`}>{badge}</span>}
       </div>
     </div>
   );
