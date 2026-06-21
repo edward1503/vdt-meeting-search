@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CloudDone, Database, Storage, Memory, Hub, DescriptionIcon, Dataset, Lan, Info } from '@/src/components/Icons';
-import { getHealth, getStats, type StatsResponse } from '@/src/lib/api';
+import { getDatasetStats, getHealth, type StatsResponse } from '@/src/lib/api';
+import type { DatasetProfile } from '@/src/types';
 
 function formatDocCount(count?: number | null) {
   if (!count) return 'unknown';
@@ -11,7 +12,7 @@ function runtimeProfileLabel(profile?: string) {
   return profile ? profile.toUpperCase() : 'UNKNOWN';
 }
 
-export function StatusView() {
+export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile | null; datasetError?: string | null }) {
   const [health, setHealth] = useState('checking');
   const [stats, setStats] = useState<StatsResponse | null>(null);
 
@@ -19,19 +20,25 @@ export function StatusView() {
     getHealth()
       .then((payload) => setHealth(payload.status))
       .catch(() => setHealth('down'));
-    getStats()
+  }, []);
+
+  useEffect(() => {
+    if (!dataset) return;
+    getDatasetStats(dataset.id)
       .then(setStats)
       .catch(() => setStats(null));
-  }, []);
+  }, [dataset?.id]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       <div className="flex flex-col gap-1.5">
         <h1 className="font-headline text-3xl font-extrabold text-on-surface">System Status</h1>
         <p className="text-sm text-on-surface-variant max-w-5xl font-medium">
-          Live infrastructure and runtime configuration for the HotpotQA Elasticsearch retrieval pipeline.
+          Live infrastructure and runtime configuration for the active dataset workspace.
         </p>
       </div>
+
+      {datasetError && <div className="bg-white border border-primary text-primary rounded-xl p-4 font-bold">{datasetError}</div>}
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-5 items-start">
         <section className="xl:col-span-5 bg-white border border-outline-variant rounded-xl p-5 shadow-sm">
@@ -54,7 +61,7 @@ export function StatusView() {
             <Memory className="text-primary" size={24} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-outline-variant">
-            <SpecItem label="Dataset" value={stats?.dataset_id ?? 'beir/hotpotqa/dev'} />
+            <SpecItem label="Dataset" value={stats?.dataset_id ?? dataset?.dataset_id ?? 'unknown'} />
             <SpecItem label="Embedding Model" value={stats?.embedding_model ?? 'BAAI/bge-small-en-v1.5'} />
             <SpecItem label="Runtime Profile" value={runtimeProfileLabel(stats?.runtime_profile)} />
           </div>
@@ -82,15 +89,13 @@ export function StatusView() {
         </div>
         <div className="bg-white border border-outline-variant rounded-xl p-5 overflow-x-auto custom-scrollbar">
           <div className="flex items-center min-w-max justify-center gap-5">
-            <FlowNode Icon={Dataset} label="HotpotQA" sub={runtimeProfileLabel(stats?.runtime_profile)} />
+            <FlowNode Icon={Dataset} label={dataset?.label ?? 'Dataset'} sub={dataset?.language?.toUpperCase() ?? runtimeProfileLabel(stats?.runtime_profile)} />
             <FlowConnector />
-            <FlowNode Icon={DescriptionIcon} label="ES BM25" sub="5.23M DOCS" isPrimary />
+            <FlowNode Icon={DescriptionIcon} label="ES Search" sub={stats?.index ?? 'INDEX'} isPrimary />
             <FlowConnector />
-            <FlowNode Icon={Hub} label="BGE Embed" sub="HOST:8010" isAlt />
+            <FlowNode Icon={Hub} label={dataset?.dense_backend === 'turbovec' ? 'TurboVec' : 'ES Dense'} sub={dataset?.embedding_model ?? 'MODEL'} isAlt />
             <FlowConnector />
-            <FlowNode Icon={Memory} label="TurboVec" sub="LOCAL .TVIM" isPrimary />
-            <FlowConnector />
-            <FlowNode Icon={Lan} label="RRF Evidence" sub="RANKED" />
+            <FlowNode Icon={Lan} label="Ranked Evidence" sub={dataset?.primary_metric ?? 'METRIC'} />
           </div>
         </div>
       </section>

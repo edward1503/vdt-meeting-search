@@ -38,6 +38,7 @@ export function HistoryView({ onRunAgain }: HistoryViewProps) {
     if (!value) return rows;
     return rows.filter((row) =>
       row.query.toLowerCase().includes(value) ||
+      (row.dataset_id ?? 'hotpotqa').toLowerCase().includes(value) ||
       row.method.toLowerCase().includes(value) ||
       row.top_docs.some((doc) => doc.doc_id.toLowerCase().includes(value) || doc.title.toLowerCase().includes(value)) ||
       row.support_doc_ids.some((doc) => doc.toLowerCase().includes(value))
@@ -106,7 +107,12 @@ export function HistoryView({ onRunAgain }: HistoryViewProps) {
                     className={cn('cursor-pointer hover:bg-surface-container-low transition-colors', selected?.id === row.id && 'bg-primary/[0.04] border-l-4 border-primary')}
                   >
                     <td className="px-6 py-4 font-mono text-[10px] text-on-surface-variant whitespace-nowrap">{formatDate(row.created_at)}</td>
-                    <td className="px-6 py-4 text-sm text-on-surface font-medium max-w-xl truncate">{row.query}</td>
+                    <td className="px-6 py-4 text-sm text-on-surface font-medium max-w-xl truncate">
+                      <span className="mr-2 px-2 py-0.5 bg-surface-container-high text-on-surface-variant font-mono text-[9px] rounded font-bold uppercase">
+                        {(row.dataset_id ?? 'hotpotqa').toUpperCase()}
+                      </span>
+                      {row.query}
+                    </td>
                     <td className="px-6 py-4"><MethodBadge method={row.method} /></td>
                     <td className="px-6 py-4 font-mono text-xs font-bold">{row.top_k}</td>
                     <td className="px-6 py-4 font-mono text-xs font-bold">{row.result_count}</td>
@@ -129,14 +135,15 @@ export function HistoryView({ onRunAgain }: HistoryViewProps) {
                   <h2 className="font-headline text-2xl font-bold text-on-surface">Run #{selected.id}</h2>
                 </div>
                 <button
-                  onClick={() => onRunAgain({ id: selected.id, query: selected.query, method: selected.method, topK: selected.top_k })}
+                  onClick={() => onRunAgain({ id: selected.id, datasetId: selected.dataset_id ?? 'hotpotqa', query: selected.query, method: selected.method, topK: selected.top_k })}
                   className="h-11 px-4 bg-primary text-on-primary rounded-lg font-bold text-xs uppercase tracking-widest hover:opacity-90 flex items-center gap-2"
                 >
                   <RotateCcw size={16} /> Run again
                 </button>
               </div>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <Metric label="Mode" value={selected.method} />
+                <Metric label="Dataset" value={(selected.dataset_id ?? 'hotpotqa').toUpperCase()} />
                 <Metric label="Top-k" value={String(selected.top_k)} />
                 <Metric label="Latency" value={`${Math.round(selected.latency_ms)}ms`} />
                 <Metric label="Cache" value={selected.cache_hit ? 'Hit' : 'Miss'} />

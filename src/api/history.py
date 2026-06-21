@@ -18,6 +18,7 @@ class SearchHistoryStore:
                 CREATE TABLE IF NOT EXISTS query_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    dataset_id TEXT NOT NULL DEFAULT 'hotpotqa',
                     query TEXT NOT NULL,
                     method TEXT NOT NULL,
                     top_k INTEGER NOT NULL,
@@ -29,11 +30,15 @@ class SearchHistoryStore:
                 )
                 """
             )
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(query_history)").fetchall()}
+            if "dataset_id" not in columns:
+                conn.execute("ALTER TABLE query_history ADD COLUMN dataset_id TEXT NOT NULL DEFAULT 'hotpotqa'")
             conn.commit()
 
     def record_search(
         self,
         *,
+        dataset_id: str = "hotpotqa",
         query: str,
         method: str,
         top_k: int,
@@ -55,10 +60,11 @@ class SearchHistoryStore:
             cursor = conn.execute(
                 """
                 INSERT INTO query_history (
-                    query, method, top_k, latency_ms, cache_hit, result_count, top_docs_json, support_doc_ids_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    dataset_id, query, method, top_k, latency_ms, cache_hit, result_count, top_docs_json, support_doc_ids_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    dataset_id,
                     query,
                     method,
                     top_k,
@@ -106,6 +112,7 @@ class SearchHistoryStore:
         return {
             "id": int(row["id"]),
             "created_at": str(row["created_at"]),
+            "dataset_id": str(row["dataset_id"]),
             "query": str(row["query"]),
             "method": str(row["method"]),
             "top_k": int(row["top_k"]),

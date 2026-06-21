@@ -1,19 +1,22 @@
 import { Analytics, AccountCircle } from '@/src/components/Icons';
-import { ViewType } from '@/src/types';
+import type { DatasetProfile, ViewType } from '@/src/types';
 
 interface TopBarProps {
   activeView: ViewType;
+  dataset: DatasetProfile | null;
 }
 
 const VIEW_TITLES: Record<ViewType, string> = {
   search: 'Knowledge Explorer',
   queries: 'Elasticsearch Workbench',
   benchmark: 'Retrieval Dashboard',
+  indexes: 'Dataset Indexes',
+  metadata: 'Dataset Metadata',
   history: 'Query History',
-  status: 'HotpotQA Elasticsearch Retrieval',
+  status: 'Dataset Retrieval Status',
 };
 
-export function TopBar({ activeView }: TopBarProps) {
+export function TopBar({ activeView, dataset }: TopBarProps) {
   return (
     <header className="bg-white border-b-4 border-primary w-full sticky top-0 z-40">
       <div className="flex items-center justify-between px-6 py-3 max-w-[1500px] mx-auto w-full">
@@ -24,6 +27,13 @@ export function TopBar({ activeView }: TopBarProps) {
           </h2>
         </div>
         <div className="flex items-center gap-4">
+          {dataset && (
+            <div className="hidden md:flex items-center space-x-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
+              <span className="font-label text-[10px] text-primary uppercase font-bold tracking-widest">
+                {dataset.id} / {dataset.language} / {dataset.readiness}
+              </span>
+            </div>
+          )}
           <div className="hidden md:flex items-center space-x-2 px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
             <span className="font-label text-[10px] text-primary uppercase font-bold tracking-widest">

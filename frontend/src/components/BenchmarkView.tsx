@@ -1,22 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { BenchmarkResult } from '@/src/types';
-import { getBenchmark, type BenchmarkDashboard, type BenchmarkSection } from '@/src/lib/api';
+import type { BenchmarkResult, DatasetProfile } from '@/src/types';
+import { getDatasetBenchmark, type BenchmarkDashboard, type BenchmarkSection } from '@/src/lib/api';
 import { Verified, TrendingUp, FactCheck, Bolt } from '@/src/components/Icons';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { cn } from '@/src/lib/utils';
 
-export function BenchmarkView() {
+export function BenchmarkView({ dataset }: { dataset: DatasetProfile | null }) {
   const [dashboard, setDashboard] = useState<BenchmarkDashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getBenchmark()
+    if (!dataset) return;
+    setDashboard(null);
+    setError(null);
+    getDatasetBenchmark(dataset.id)
       .then(setDashboard)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load benchmark data'));
-  }, []);
+  }, [dataset?.id]);
 
   const current = dashboard?.current ?? emptySection('Current Full-Corpus Benchmark');
   const legacy = dashboard?.legacy ?? emptySection('Legacy Nano / Elasticsearch Benchmarks');
+  const isVimQA = dataset?.id === 'vimqa';
   const bestRecall = Math.max(0, ...current.results.map((d) => d.recall10));
   const bestNdcg = Math.max(0, ...current.results.map((d) => d.ndcg10));
   const bestFullSupport = Math.max(0, ...current.results.map((d) => d.fullSup10));
@@ -24,17 +28,19 @@ export function BenchmarkView() {
 
   const scatterData = useMemo(() => current.results.map((d) => ({
     x: d.p50,
-    y: d.fullSup10,
+    y: isVimQA ? d.recall10 : d.fullSup10,
     name: d.method,
     peak: d.isPeak,
-  })), [current.results]);
+  })), [current.results, isVimQA]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col gap-1.5">
         <h3 className="font-headline text-3xl font-extrabold text-on-surface">Retrieval Quality Benchmarks</h3>
         <p className="text-on-surface-variant max-w-5xl text-sm font-normal">
-          Benchmark results are organized by project progress: the current full-corpus TurboVec runtime is shown first, while older nano/Elasticsearch runs remain below as historical context.
+          {isVimQA
+            ? 'VimQA is a single-context retrieval proxy, so recall, MRR, and nDCG are emphasized over HotpotQA full-support metrics.'
+            : 'HotpotQA is multi-hop, so full-support recall remains the project metric for retrieving all evidence documents.'}
         </p>
       </div>
 
@@ -43,7 +49,7 @@ export function BenchmarkView() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <SummaryCard label="Best Recall@10" value={bestRecall.toFixed(3)} Icon={Verified} badge="Current Run" />
         <SummaryCard label="Best nDCG@10" value={bestNdcg.toFixed(3)} Icon={TrendingUp} badge="Current Run" isAlt />
-        <SummaryCard label="Best Full-Support@10" value={bestFullSupport.toFixed(3)} Icon={FactCheck} badge="HotpotQA Key Metric" />
+        <SummaryCard label={isVimQA ? 'Best Recall@10' : 'Best Full-Support@10'} value={(isVimQA ? bestRecall : bestFullSupport).toFixed(3)} Icon={FactCheck} badge={dataset?.primary_metric ?? 'Primary Metric'} />
         <SummaryCard label="Fastest p50 Latency" value={fastest ? `${Math.round(fastest.p50)}ms` : '0ms'} Icon={Bolt} badge={fastest?.method ?? 'N/A'} isMuted />
       </div>
 
@@ -64,13 +70,13 @@ export function BenchmarkView() {
 
       <section className="grid grid-cols-1 xl:grid-cols-5 gap-5 items-stretch">
         <div className="xl:col-span-3 bg-white border border-outline-variant p-4 rounded-xl shadow-sm flex flex-col min-h-[320px]">
-          <h5 className="font-label text-[10px] text-on-surface-variant mb-3 uppercase tracking-widest text-center font-bold">Efficiency Frontier (Full-Support vs p50)</h5>
+          <h5 className="font-label text-[10px] text-on-surface-variant mb-3 uppercase tracking-widest text-center font-bold">Efficiency Frontier ({isVimQA ? 'Recall' : 'Full-Support'} vs p50)</h5>
           <div className="flex-1 min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f8" />
                 <XAxis type="number" dataKey="x" name="Latency" unit="ms" label={{ value: 'Latency (p50)', position: 'insideBottom', offset: -10, className: 'font-label text-[10px] uppercase font-bold' }} />
-                <YAxis type="number" dataKey="y" name="Full-support" domain={[0, 1]} label={{ value: 'Full Support@10', angle: -90, position: 'insideLeft', className: 'font-label text-[10px] uppercase font-bold' }} />
+                <YAxis type="number" dataKey="y" name={isVimQA ? 'Recall' : 'Full-support'} domain={[0, 1]} label={{ value: isVimQA ? 'Recall@10' : 'Full Support@10', angle: -90, position: 'insideLeft', className: 'font-label text-[10px] uppercase font-bold' }} />
                 <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                 <Scatter name="Methods" data={scatterData}>
                   {scatterData.map((entry, index) => (

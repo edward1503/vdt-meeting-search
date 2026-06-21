@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -63,4 +63,4 @@ This story records the new follow-up created from the decision to process VimQA 
 
 - 2026-06-21: Detailed implementation plan prepared for review at `docs/superpowers/plans/2026-06-21-dataset-first-api-ui-refactor.md`. Plan keeps the story in `planned` status, preserves legacy HotpotQA endpoint compatibility, adds explicit Indexes and Metadata workspace views, and defers implementation until human approval.
 - 2026-06-21: Review decision captured: use one API process and one UI; expose HotpotQA/VimQA through `/datasets/{dataset_id}/...` endpoint namespaces; keep the UI query/read-only; keep VimQA default method as `es_bm25`; show VimQA metadata filters as unsupported.
-- Planned implementation evidence still required: backend dataset/API/cache/history tests, frontend lint/typecheck, and Docker/API smoke when runtime indexes are available.
+- 2026-06-21: Implemented dataset-first API/UI runtime refactor. API proof: `python -m pytest tests/test_api_dataset_profiles.py tests/test_api_es_config.py tests/test_api_cache.py tests/test_search_history.py -q` -> 36 passed; `python -m pytest tests/test_elasticsearch_retriever.py tests/test_turbovec_retriever.py -q` -> 28 passed. Frontend proof: `cd frontend; npm run lint` -> TypeScript passed. API smoke proof: FastAPI `TestClient` returned 200 for `/datasets`, `/datasets/vimqa/stats`, `/datasets/vimqa/queries?limit=1`, and `/datasets/vimqa/benchmarks`. Browser/Docker selector smoke was not run because Playwright is not installed locally and prepared runtime indexes were not verified in this turn.

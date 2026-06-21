@@ -45,3 +45,35 @@ def test_search_history_store_records_lists_and_clears(tmp_path: Path) -> None:
 
     assert store.clear_history() == 2
     assert store.list_history(limit=10) == []
+
+
+def test_history_store_records_dataset_id(tmp_path: Path) -> None:
+    store = SearchHistoryStore(tmp_path / "history.sqlite3")
+    store.init_db()
+
+    history_id = store.record_search(
+        dataset_id="vimqa",
+        query="Hà Nội là thủ đô của nước nào?",
+        method="es_bm25",
+        top_k=10,
+        latency_ms=12.5,
+        cache_hit=False,
+        results=[{"doc_id": "vimqa_ctx_1", "title": "VimQA context", "score": 1.0, "rank": 1}],
+        support_doc_ids=["vimqa_ctx_1"],
+    )
+
+    row = store.get_history(history_id)
+
+    assert row is not None
+    assert row["dataset_id"] == "vimqa"
+
+
+def test_history_store_backfills_dataset_id_for_existing_tables(tmp_path: Path) -> None:
+    db_path = tmp_path / "history.sqlite3"
+    store = SearchHistoryStore(db_path)
+    store.init_db()
+
+    with store._connect() as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(query_history)").fetchall()}
+
+    assert "dataset_id" in columns

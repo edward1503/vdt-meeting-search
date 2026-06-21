@@ -1,16 +1,17 @@
 import { DescriptionIcon, Hub, Bolt, Route, ExportNotes, Search, MoreVert } from '@/src/components/Icons';
 import { useEffect, useState } from 'react';
-import type { Query, SearchPreset } from '@/src/types';
+import type { DatasetProfile, Query, SearchPreset } from '@/src/types';
 import { cn } from '@/src/lib/utils';
-import { getQueries } from '@/src/lib/api';
+import { getDatasetQueries } from '@/src/lib/api';
 
 const PAGE_SIZE = 10;
 
 interface QueriesViewProps {
+  dataset: DatasetProfile | null;
   onSearchQuery: (preset: SearchPreset) => void;
 }
 
-export function QueriesView({ onSearchQuery }: QueriesViewProps) {
+export function QueriesView({ dataset, onSearchQuery }: QueriesViewProps) {
   const [queries, setQueries] = useState<Query[]>([]);
   const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
   const [filter, setFilter] = useState('');
@@ -22,10 +23,16 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
 
   useEffect(() => {
     let cancelled = false;
+    if (!dataset) {
+      setQueries([]);
+      setSelectedQuery(null);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
-    getQueries({ limit: PAGE_SIZE, offset, search: filter })
+    getDatasetQueries(dataset.id, { limit: PAGE_SIZE, offset, search: filter })
       .then((page) => {
         if (cancelled) return;
         setQueries(page.queries);
@@ -45,7 +52,7 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [filter, offset]);
+  }, [dataset?.id, filter, offset]);
 
   const pageNumber = Math.floor(offset / PAGE_SIZE) + 1;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -59,10 +66,11 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
     setOffset(0);
   }
 
-  function handoffSelectedSearch(method = 'tv_hybrid') {
+  function handoffSelectedSearch(method = dataset?.default_method ?? 'es_bm25') {
     if (!selectedQuery) return;
     const preset: SearchPreset = {
       id: Date.now(),
+      datasetId: dataset?.id,
       queryId: selectedQuery.id,
       query: selectedQuery.text,
       method,
@@ -88,7 +96,7 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
           </div>
           <div className="flex items-center justify-between mt-4 gap-4">
             <div className="flex space-x-2">
-              <FilterChip label="FULL DEV" active />
+              <FilterChip label={dataset?.id === 'vimqa' ? 'VIMQA ALL' : 'FULL DEV'} active />
               <FilterChip label="10 / PAGE" />
             </div>
             <span className="font-mono text-[10px] text-outline uppercase tracking-widest font-bold">
@@ -175,7 +183,7 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
               <span className="font-label text-[10px] text-outline uppercase tracking-[0.2em] font-bold">Metadata</span>
               <div className="flex items-center gap-2 min-w-0">
                 <div className="font-mono text-xl text-primary font-bold truncate">{selectedQuery.id}</div>
-                <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[9px] rounded font-bold uppercase shrink-0">HOTPOTQA</span>
+                <span className="px-2 py-0.5 bg-surface-container text-on-surface-variant font-mono text-[9px] rounded font-bold uppercase shrink-0">{dataset?.id ?? 'dataset'}</span>
               </div>
             </div>
 
@@ -199,7 +207,7 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
                     </div>
                     <div className="min-w-0">
                       <p className="font-mono text-xs font-bold text-on-surface break-all">{doc}</p>
-                      <p className="text-xs text-on-surface-variant mt-1 leading-relaxed line-clamp-2">Gold support document from HotpotQA qrels.</p>
+                      <p className="text-xs text-on-surface-variant mt-1 leading-relaxed line-clamp-2">{dataset?.id === 'vimqa' ? 'Gold context from VimQA qrels.' : 'Gold support document from HotpotQA qrels.'}</p>
                     </div>
                   </div>
                 ))}
@@ -224,7 +232,7 @@ export function QueriesView({ onSearchQuery }: QueriesViewProps) {
         <div className="p-4 border-t border-outline-variant bg-white space-y-2 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
           {runState && <div className="text-[10px] font-mono text-primary font-bold uppercase tracking-widest truncate">{runState}</div>}
           <div className="grid grid-cols-3 gap-2">
-            <CompactActionButton Icon={Bolt} label="Run Hybrid" primary onClick={() => handoffSelectedSearch('tv_hybrid')} />
+            <CompactActionButton Icon={Bolt} label="Run Default" primary onClick={() => handoffSelectedSearch(dataset?.default_method ?? 'es_bm25')} />
             <CompactActionButton Icon={Route} label="BM25" onClick={() => handoffSelectedSearch('es_bm25')} />
             <CompactActionButton Icon={ExportNotes} label="Export" onClick={() => setRunState('Export uses current query page.')} />
           </div>

@@ -62,6 +62,43 @@ Open:
 
 The frontend container uses Vite hot reload with `./frontend:/app` and a Docker named volume for `/app/node_modules`. The API container uses Uvicorn reload with bind-mounted Python source. Redis caches repeated `/search` responses using `REDIS_URL` and `SEARCH_CACHE_TTL_SECONDS`. TurboVec search loads the mounted full `.tvim` artifact from `./artifacts`, and query embeddings call the local embedding service at `http://host.docker.internal:8010/embed`, so PyTorch and SentenceTransformers stay outside the Docker API image.
 
+## Dataset-First Runtime
+
+The dashboard exposes HotpotQA and VimQA as dataset workspaces from one API/frontend runtime.
+
+- `GET /datasets` lists available dataset profiles.
+- Dataset-scoped endpoints live under `/datasets/{dataset_id}/...`, for example `/datasets/hotpotqa/search` and `/datasets/vimqa/search`.
+- The React UI uses a dataset selector, then routes Search, Queries, Benchmarks, Indexes, Metadata, History, and Status through the active dataset profile.
+- Legacy endpoints `/stats`, `/queries`, `/benchmark`, and `/search` remain HotpotQA-compatible during migration.
+- The UI is a query and inspection surface only. It does not create, delete, rebuild, or edit Elasticsearch indexes or metadata schemas.
+
+Dataset flow:
+
+```text
+Select VimQA
+-> Queries calls GET /datasets/vimqa/queries
+-> Run Default sends POST /datasets/vimqa/search with method es_bm25
+-> Benchmark calls GET /datasets/vimqa/benchmarks and emphasizes recall/MRR/nDCG
+-> Metadata displays filters unsupported
+```
+
+```text
+Select HotpotQA
+-> Queries calls GET /datasets/hotpotqa/queries
+-> Search calls POST /datasets/hotpotqa/search with HotpotQA methods
+-> Benchmark calls GET /datasets/hotpotqa/benchmarks and emphasizes full-support recall
+-> Metadata displays supported filter fields
+```
+
+Runtime modes:
+
+| Mode | Services | Use |
+| --- | --- | --- |
+| UI/API lightweight | frontend + api | Inspect profiles and static benchmark/query artifacts; search may fail without indexes. |
+| Search runtime | frontend + api + elasticsearch + redis + embedding service when dense/TurboVec is used | Run interactive search. |
+| Index/benchmark runtime | elasticsearch + scripts | Build indexes and benchmark artifacts. |
+| Full demo runtime | frontend + api + elasticsearch + redis + embedding service + prepared HotpotQA/VimQA indexes | Side-by-side HotpotQA/VimQA workspace demo. |
+
 ## API Demo
 
 Without Docker, run the API and frontend separately:

@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { getStats, searchHotpotQA, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
-import type { SearchPreset } from '@/src/types';
+import { searchDataset, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
+import type { DatasetProfile, SearchPreset } from '@/src/types';
 
-const SUGGESTIONS = [
+const HOTPOTQA_SUGGESTIONS = [
   'What occupations do both Ian Hunter and Rob Thomas have?',
   'The Death of Cook depicts the death of James Cook at a bay on what coast?',
+];
+
+const VIMQA_SUGGESTIONS = [
+  'Hà Nội là thủ đô của nước nào?',
+  'Việt Nam có thủ đô nào?',
 ];
 
 const METHOD_LABELS: Record<string, string> = {
@@ -14,6 +19,8 @@ const METHOD_LABELS: Record<string, string> = {
   tv_dense: 'TurboVec Dense (Vector Only)',
   tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
   es_bm25: 'Standard BM25 (Keyword Only)',
+  es_dense: 'Elasticsearch Dense Vector',
+  es_hybrid: 'Elasticsearch Hybrid RRF',
 };
 
 const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25'];
@@ -25,8 +32,9 @@ function methodOptions(methods?: string[]) {
   }));
 }
 
-export function SearchView({ preset }: { preset?: SearchPreset | null }) {
-  const [query, setQuery] = useState(SUGGESTIONS[0]);
+export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null; preset?: SearchPreset | null }) {
+  const suggestions = dataset?.id === 'vimqa' ? VIMQA_SUGGESTIONS : HOTPOTQA_SUGGESTIONS;
+  const [query, setQuery] = useState(HOTPOTQA_SUGGESTIONS[0]);
   const [queryId, setQueryId] = useState<string | undefined>(undefined);
   const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
   const [method, setMethod] = useState('tv_hybrid');
@@ -37,17 +45,13 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   const lastAutoRunKey = useRef<string | null>(null);
 
   useEffect(() => {
-    getStats()
-      .then((stats) => {
-        const methods = stats.methods?.length ? stats.methods : FALLBACK_METHODS;
-        setAvailableMethods(methods);
-        setMethod(methods.includes(stats.default_search_method ?? '') ? stats.default_search_method! : methods[0] ?? 'tv_hybrid');
-      })
-      .catch(() => {
-        setAvailableMethods(FALLBACK_METHODS);
-        setMethod('tv_hybrid');
-      });
-  }, []);
+    const methods = dataset?.methods?.length ? dataset.methods : FALLBACK_METHODS;
+    setAvailableMethods(methods);
+    setMethod(methods.includes(dataset?.default_method ?? '') ? dataset!.default_method : methods[0] ?? 'es_bm25');
+    setQuery((current) => current || suggestions[0]);
+    setResponse(null);
+    setError(null);
+  }, [dataset?.id]);
 
   useEffect(() => {
     if (!preset) return;
@@ -60,7 +64,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
     setError(null);
 
     if (preset.autoRun) {
-      const runKey = `${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
+      const runKey = `${preset.datasetId ?? dataset?.id ?? ''}:${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
       if (lastAutoRunKey.current !== runKey) {
         lastAutoRunKey.current = runKey;
         runSearch(preset.query, preset.queryId, nextMethod, preset.topK);
@@ -71,11 +75,15 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
   async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
+    if (!dataset) {
+      setError('Dataset profile is not loaded yet');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchHotpotQA(trimmed, nextMethod, nextTopK, nextQueryId);
+      const payload = await searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -117,7 +125,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
 
         <div className="flex flex-wrap items-center gap-3 px-2">
           <span className="text-on-surface-variant font-label text-xs uppercase tracking-widest font-bold opacity-60">Suggested:</span>
-          {SUGGESTIONS.map((suggestion) => (
+          {suggestions.map((suggestion) => (
             <SuggestionChip
               key={suggestion}
               label={suggestion}
@@ -188,7 +196,7 @@ export function SearchView({ preset }: { preset?: SearchPreset | null }) {
           ))}
           {!response && !error && (
             <div className="bg-white border border-outline-variant rounded-xl p-6 text-on-surface-variant font-medium">
-              Run a search to retrieve ranked HotpotQA evidence from the API.
+              Run a search to retrieve ranked evidence from the active dataset workspace.
             </div>
           )}
         </div>
