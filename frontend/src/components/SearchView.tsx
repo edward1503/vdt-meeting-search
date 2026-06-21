@@ -48,7 +48,8 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     const methods = dataset?.methods?.length ? dataset.methods : FALLBACK_METHODS;
     setAvailableMethods(methods);
     setMethod(methods.includes(dataset?.default_method ?? '') ? dataset!.default_method : methods[0] ?? 'es_bm25');
-    setQuery((current) => current || suggestions[0]);
+    setQuery(suggestions[0]);
+    setQueryId(undefined);
     setResponse(null);
     setError(null);
   }, [dataset?.id]);
