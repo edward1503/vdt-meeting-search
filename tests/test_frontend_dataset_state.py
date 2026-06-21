@@ -10,5 +10,5 @@ def test_search_view_resets_query_identity_when_dataset_changes() -> None:
     dataset_effect_end = source.index("  }, [dataset?.id]);", dataset_effect_start)
     dataset_effect = source[dataset_effect_start:dataset_effect_end]
 
-    assert "setQuery(suggestions[0]);" in dataset_effect
-    assert "setQueryId(undefined);" in dataset_effect
+    assert "setQuery(suggestions[0].label);" in dataset_effect
+    assert "setQueryId(suggestions[0].queryId);" in dataset_effect

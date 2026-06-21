@@ -4,14 +4,25 @@ import { cn } from '@/src/lib/utils';
 import { searchDataset, type SearchFilters, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
 import type { DatasetProfile, SearchPreset } from '@/src/types';
 
-const HOTPOTQA_SUGGESTIONS = [
-  'What occupations do both Ian Hunter and Rob Thomas have?',
-  'The Death of Cook depicts the death of James Cook at a bay on what coast?',
+type SearchSuggestion = {
+  label: string;
+  queryId: string;
+};
+
+const HOTPOTQA_SUGGESTIONS: SearchSuggestion[] = [
+  { label: 'Daniel Márcio Fernandes plays for a club founded in which year ?', queryId: '5ae81fbf55429952e35eaa37' },
+  { label: 'Scarface Nation was a book written by an arts critic of what nationality?', queryId: '5ac4401b5542997ea680ca4c' },
 ];
 
-const VIMQA_SUGGESTIONS = [
-  'Hà Nội là thủ đô của nước nào?',
-  'Việt Nam có thủ đô nào?',
+const VIMQA_SUGGESTIONS: SearchSuggestion[] = [
+  {
+    label: 'Film điện ảnh mà Margalit Ruth "Maggie" Gyllenhaal nhận được vai phụ độc lập vào năm 2001 có kinh phí là 4,5 triệu USD phải không?',
+    queryId: 'vimqa_train_000000',
+  },
+  {
+    label: 'Giải thưởng mà Mario J. Molina nhận năm 1995 được trao bởi Viện phim Mỹ phải không?',
+    queryId: 'vimqa_train_000001',
+  },
 ];
 
 const METHOD_LABELS: Record<string, string> = {
@@ -50,8 +61,8 @@ function compactMetadataFilters(filters: SearchFilters): SearchFilters {
 
 export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null; preset?: SearchPreset | null }) {
   const suggestions = dataset?.id === 'vimqa' ? VIMQA_SUGGESTIONS : HOTPOTQA_SUGGESTIONS;
-  const [query, setQuery] = useState(HOTPOTQA_SUGGESTIONS[0]);
-  const [queryId, setQueryId] = useState<string | undefined>(undefined);
+  const [query, setQuery] = useState(HOTPOTQA_SUGGESTIONS[0].label);
+  const [queryId, setQueryId] = useState<string | undefined>(HOTPOTQA_SUGGESTIONS[0].queryId);
   const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
   const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
@@ -68,8 +79,8 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     const methods = dataset?.methods?.length ? dataset.methods : FALLBACK_METHODS;
     setAvailableMethods(methods);
     setMethod(methods.includes(dataset?.default_method ?? '') ? dataset!.default_method : methods[0] ?? 'es_bm25');
-    setQuery(suggestions[0]);
-    setQueryId(undefined);
+    setQuery(suggestions[0].label);
+    setQueryId(suggestions[0].queryId);
     setMetadataFilters({});
     setResponse(null);
     setError(null);
@@ -158,13 +169,13 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
           <span className="text-on-surface-variant font-label text-xs uppercase tracking-widest font-bold opacity-60">Suggested:</span>
           {suggestions.map((suggestion) => (
             <SuggestionChip
-              key={suggestion}
-              label={suggestion}
+              key={suggestion.queryId}
+              label={suggestion.label}
               disabled={isLoading}
               onClick={() => {
-                setQuery(suggestion);
-                setQueryId(undefined);
-                runSearch(suggestion, undefined);
+                setQuery(suggestion.label);
+                setQueryId(suggestion.queryId);
+                runSearch(suggestion.label, suggestion.queryId);
               }}
             />
           ))}
