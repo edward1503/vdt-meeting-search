@@ -32,6 +32,15 @@ export function BenchmarkView({ dataset }: { dataset: DatasetProfile | null }) {
     name: d.method,
     peak: d.isPeak,
   })), [current.results, isVimQA]);
+  const protocolRows = isVimQA ? [
+    ['Current table', 'Full VimQA query set with 9,044 labeled queries across BM25, BKAI dense, and BM25+BKAI hybrid.'],
+    ['Dataset protocol', 'Use vimqa/all queries and qrels with Recall@10, MRR@10, and nDCG@10 as the comparison metrics.'],
+    ['Project metric', 'Prefer Recall@10 for the single-context retrieval proxy; no HotpotQA full-support claim is made.'],
+  ] : [
+    ['Current table', 'Full corpus, 200 dev queries, project-progress pilot.'],
+    ['Paper-style run', 'Run full beir/hotpotqa/test, 7,405 queries, nDCG@10 as primary metric.'],
+    ['Project metric', 'Keep Full-support Recall@10 because HotpotQA requires retrieving both evidence documents.'],
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -55,7 +64,7 @@ export function BenchmarkView({ dataset }: { dataset: DatasetProfile | null }) {
 
       <section className="grid grid-cols-1 xl:grid-cols-7 gap-5 items-stretch">
         <div className="xl:col-span-5 bg-white border border-outline-variant rounded-xl shadow-sm overflow-hidden h-full flex flex-col">
-          <SectionHeader section={current} badge="Current" />
+          <SectionHeader section={current} badge="Current" metricLabel={isVimQA ? 'Best recall' : 'Best full support'} />
           <BenchmarkTable rows={current.results} showQueries />
         </div>
 
@@ -89,13 +98,13 @@ export function BenchmarkView({ dataset }: { dataset: DatasetProfile | null }) {
         </div>
         <div className="xl:col-span-2 bg-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-outline-variant bg-surface-container">
-            <h4 className="font-headline text-lg font-bold text-on-surface">Paper Comparison Protocol</h4>
-            <p className="text-[11px] text-on-surface-variant mt-1">Use this before claiming comparability with BEIR papers.</p>
+            <h4 className="font-headline text-lg font-bold text-on-surface">Benchmark Protocol</h4>
+            <p className="text-[11px] text-on-surface-variant mt-1">Use this before interpreting project benchmark evidence.</p>
           </div>
           <div className="p-4 space-y-3 text-sm text-on-surface-variant leading-relaxed">
-            <p><span className="font-bold text-on-surface">Current table:</span> full corpus, 200 dev queries, project-progress pilot.</p>
-            <p><span className="font-bold text-on-surface">Paper-style run:</span> full beir/hotpotqa/test, 7,405 queries, nDCG@10 as primary metric.</p>
-            <p><span className="font-bold text-on-surface">Project metric:</span> keep Full-support Recall@10 because HotpotQA requires retrieving both evidence documents.</p>
+            {protocolRows.map(([label, value]) => (
+              <p key={label}><span className="font-bold text-on-surface">{label}:</span> {value}</p>
+            ))}
           </div>
         </div>
       </section>
@@ -112,7 +121,7 @@ function emptySection(title: string): BenchmarkSection {
   return { title, subtitle: '', config: {}, results: [] };
 }
 
-function SectionHeader({ section, badge, muted }: { section: BenchmarkSection; badge: string; muted?: boolean }) {
+function SectionHeader({ section, badge, muted, metricLabel = 'Best full support' }: { section: BenchmarkSection; badge: string; muted?: boolean; metricLabel?: string }) {
   return (
     <div className="px-4 py-3 border-b border-outline-variant bg-surface-container flex justify-between items-start gap-3">
       <div>
@@ -123,7 +132,7 @@ function SectionHeader({ section, badge, muted }: { section: BenchmarkSection; b
         {section.subtitle && <p className="text-[11px] text-on-surface-variant mt-1 max-w-4xl">{section.subtitle}</p>}
       </div>
       <div className="flex gap-4 pt-1">
-        <LegendItem color="bg-primary" label="Best full support" />
+        <LegendItem color="bg-primary" label={metricLabel} />
         <LegendItem color="bg-outline" label="Baseline" />
       </div>
     </div>

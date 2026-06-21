@@ -102,7 +102,7 @@ export function StatusView({ dataset, datasetError }: { dataset: DatasetProfile 
             <SpecItem label="Candidate Pool" value={String(stats?.num_candidates ?? 'unknown')} />
             <SpecItem label="Cache TTL" value={`${stats?.search_cache_ttl_seconds ?? 300}s`} />
             <StatItem label="Corpus" value={formatDocCount(stats?.corpus_doc_count)} unit="docs" />
-            <StatItem label="Benchmarks" value="50" unit="cases" />
+            <StatItem label="Benchmarks" value={formatDocCount(stats?.benchmark_query_count)} unit="queries" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 border-t border-outline-variant divide-y md:divide-y-0 md:divide-x divide-outline-variant">
             <SpecItem label="Available Methods" value={stats?.methods?.join(', ') ?? 'loading'} />

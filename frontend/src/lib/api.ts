@@ -90,6 +90,7 @@ export interface StatsResponse {
   turbovec_bit_width?: number | null;
   runtime_profile?: string;
   corpus_doc_count?: number | null;
+  benchmark_query_count?: number | null;
 }
 
 export interface EmbeddingHealthResponse {
@@ -270,6 +271,10 @@ function methodLabel(method: string): string {
   switch (method) {
     case 'es_bm25':
       return 'Keyword baseline';
+    case 'es_dense':
+      return 'Elasticsearch dense vector';
+    case 'es_hybrid':
+      return 'Elasticsearch BM25 + dense RRF';
     case 'tv_dense':
       return 'TurboVec dense retrieval';
     case 'tv_hybrid':

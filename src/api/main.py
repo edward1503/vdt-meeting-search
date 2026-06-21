@@ -455,6 +455,25 @@ def infer_corpus_doc_count(index: str) -> int | None:
         return 1000
     return None
 
+def benchmark_query_count_for_profile(profile: DatasetProfile) -> int | None:
+    counts = []
+    for path in profile.benchmark_files:
+        if not path.exists():
+            continue
+        try:
+            result = load_benchmark_result(path)
+        except Exception:
+            continue
+        config = result.get("config", {})
+        config_count = config.get("queries") or config.get("max_queries")
+        if config_count:
+            counts.append(int(config_count))
+        for row in result.get("results", []):
+            row_count = row.get("metrics", {}).get("queries")
+            if row_count:
+                counts.append(int(row_count))
+    return max(counts) if counts else None
+
 
 @app.get("/datasets")
 def datasets() -> dict[str, Any]:
@@ -491,6 +510,7 @@ def dataset_stats(dataset_id: str) -> dict[str, Any]:
         "turbovec_bit_width": settings.turbovec_bit_width if profile.dense_backend == "turbovec" else None,
         "runtime_profile": profile.id,
         "corpus_doc_count": infer_corpus_doc_count(profile.index) or (3623 if profile.id == "vimqa" else None),
+        "benchmark_query_count": benchmark_query_count_for_profile(profile),
         "primary_metric": profile.primary_metric,
     }
 
@@ -564,15 +584,30 @@ def build_dataset_benchmark_dashboard(profile: DatasetProfile) -> dict[str, Any]
     for result in loaded:
         config.update(result.get("config", {}))
         rows.extend(result.get("results", []))
+    rows_by_method = {str(row.get("method", "")): row for row in rows}
+    ordered_methods = [method for method in profile.methods if method in rows_by_method]
+    ordered_rows = [rows_by_method[method] for method in ordered_methods]
+    query_count = benchmark_query_count_for_profile(profile)
+    config.update(
+        {
+            "dataset_id": profile.dataset_id,
+            "index": profile.index,
+            "methods": ordered_methods,
+            "queries": query_count,
+            "primary_metric": profile.primary_metric,
+            "benchmark_scope": "Full VimQA query set with 9,044 labeled queries" if profile.id == "vimqa" else "Dataset-scoped benchmark artifact",
+            "paper_comparable": False,
+        }
+    )
     return {
         "current": {
             "title": f"{profile.label} Benchmark",
             "subtitle": "Dataset-scoped project evidence; not a leaderboard claim.",
             "config": config,
-            "results": rows,
+            "results": ordered_rows,
         },
         "legacy": {"title": "Legacy Benchmarks", "subtitle": "No legacy section for this dataset.", "config": {}, "results": []},
-        "results": rows,
+        "results": ordered_rows,
     }
 
 
