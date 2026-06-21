@@ -29,11 +29,21 @@ LEGACY_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_it
 
 ES_METHODS = {"es_bm25"}
 TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
+DENSE_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "es_dense", "es_hybrid"}
 ES_METHOD_MAP = {
     "es_bm25": "bm25",
 }
 METHODS = ES_METHODS | TV_METHODS
 logger = logging.getLogger("uvicorn.error")
+
+def profile_uses_remote_embedding(profile: DatasetProfile) -> bool:
+    return profile.dense_backend == "turbovec" or any(method in DENSE_METHODS for method in profile.methods)
+
+def embedding_service_url_for_profile(profile: DatasetProfile) -> str:
+    return settings.embedding_service_url if profile_uses_remote_embedding(profile) else ""
+
+def embedding_model_id_for_profile(profile: DatasetProfile) -> str:
+    return "" if profile.id == "hotpotqa" else profile.id
 
 def build_search_cache_key(
     *,
@@ -198,8 +208,9 @@ def get_es_retriever_for_profile(profile_id: str) -> ElasticsearchRetriever:
         index=profile.index,
         model_name=profile.embedding_model,
         num_candidates=settings.elasticsearch_num_candidates,
-        embedding_service_url=settings.embedding_service_url if profile.dense_backend == "turbovec" else "",
+        embedding_service_url=embedding_service_url_for_profile(profile),
         embedding_timeout_seconds=settings.embedding_timeout_seconds,
+        embedding_model_id=embedding_model_id_for_profile(profile),
     )
 
 
@@ -224,6 +235,7 @@ def get_tv_retriever_for_profile(profile_id: str) -> TurboVecHybridRetriever:
         model_name=profile.embedding_model,
         embedding_service_url=settings.embedding_service_url,
         embedding_timeout_seconds=settings.embedding_timeout_seconds,
+        embedding_model_id=embedding_model_id_for_profile(profile),
     )
 
 
@@ -457,7 +469,7 @@ def dataset_stats(dataset_id: str) -> dict[str, Any]:
         "dataset_profile": profile.to_public_dict(),
         "default_search_method": profile.default_method,
         "embedding_model": profile.embedding_model,
-        "embedding_service_url": settings.embedding_service_url if profile.dense_backend == "turbovec" else "",
+        "embedding_service_url": embedding_service_url_for_profile(profile),
         "num_candidates": settings.elasticsearch_num_candidates,
         "search_cache_ttl_seconds": settings.search_cache_ttl_seconds,
         "history_db_path": str(settings.history_db_path),

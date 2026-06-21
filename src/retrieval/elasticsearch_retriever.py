@@ -111,6 +111,7 @@ class ElasticsearchRetriever:
         model: Any | None = None,
         embedding_service_url: str = "",
         embedding_timeout_seconds: int = 30,
+        embedding_model_id: str = "",
     ) -> None:
         self.es = es
         self.index = index
@@ -119,6 +120,7 @@ class ElasticsearchRetriever:
         self.num_candidates = num_candidates
         self.embedding_service_url = embedding_service_url.rstrip("/")
         self.embedding_timeout_seconds = embedding_timeout_seconds
+        self.embedding_model_id = embedding_model_id
 
     def search(self, query: str, method: str, top_k: int, candidate_k: int = 100, rrf_k: int = 60) -> list[dict[str, Any]]:
         if method == "bm25":
@@ -203,7 +205,10 @@ class ElasticsearchRetriever:
         return _vector_to_list(self._model().encode([query], normalize_embeddings=True, convert_to_numpy=True)[0])
 
     def _embed_query_remote(self, query: str) -> list[float]:
-        payload = json.dumps({"text": query}, separators=(",", ":")).encode("utf-8")
+        body: dict[str, str] = {"text": query}
+        if self.embedding_model_id:
+            body["model_id"] = self.embedding_model_id
+        payload = json.dumps(body, separators=(",", ":")).encode("utf-8")
         req = request.Request(
             self.embedding_service_url,
             data=payload,

@@ -193,3 +193,40 @@ def test_turbovec_from_paths_uses_remote_embedder_when_url_is_configured(monkeyp
     assert isinstance(retriever.embedder, turbovec_retriever.RemoteEmbeddingClient)
     assert retriever.embedder.embedding_service_url == "http://host.docker.internal:8010/embed"
     assert retriever.embedder.timeout_seconds == 9
+
+def test_elasticsearch_retriever_remote_embedding_includes_model_id(monkeypatch):
+    import json
+
+    from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def read(self):
+            return b'{"embedding":[0.1,0.2,0.3]}'
+
+    def fake_urlopen(req, timeout):
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr("src.retrieval.elasticsearch_retriever.request.urlopen", fake_urlopen)
+
+    retriever = ElasticsearchRetriever(
+        es=object(),
+        index="vimqa_all_dense_bkai_current",
+        model_name="bkai-foundation-models/vietnamese-bi-encoder",
+        embedding_service_url="http://embedding:8010/embed",
+        embedding_timeout_seconds=11,
+        embedding_model_id="vimqa",
+    )
+
+    assert retriever._embed_query("xin chao") == [0.1, 0.2, 0.3]
+    assert captured["body"] == {"text": "xin chao", "model_id": "vimqa"}
+    assert captured["timeout"] == 11

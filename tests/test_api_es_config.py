@@ -620,3 +620,32 @@ def test_get_tv_retriever_passes_embedding_service_settings(monkeypatch):
     assert main.get_tv_retriever() == "tv"
     assert captured["embedding_service_url"] == main.settings.embedding_service_url
     assert captured["embedding_timeout_seconds"] == main.settings.embedding_timeout_seconds
+
+def test_vimqa_stats_reports_embedding_service_url():
+    from src.api import main
+
+    payload = main.dataset_stats("vimqa")
+
+    assert payload["embedding_service_url"] == main.settings.embedding_service_url
+
+def test_get_es_retriever_for_vimqa_uses_remote_embedding_service(monkeypatch):
+    from src.api import main
+
+    captured = {}
+
+    class FakeElasticsearch:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeRetriever:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+    main.get_es_retriever_for_profile.cache_clear()
+    monkeypatch.setattr("elasticsearch.Elasticsearch", FakeElasticsearch)
+    monkeypatch.setattr(main, "ElasticsearchRetriever", FakeRetriever)
+
+    main.get_es_retriever_for_profile("vimqa")
+
+    assert captured["embedding_service_url"] == main.settings.embedding_service_url
+    assert captured["embedding_model_id"] == "vimqa"

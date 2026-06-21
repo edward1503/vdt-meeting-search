@@ -11,14 +11,18 @@ from src.retrieval.elasticsearch_retriever import fuse_rrf
 
 
 class RemoteEmbeddingClient:
-    def __init__(self, embedding_service_url: str, timeout_seconds: int = 30) -> None:
+    def __init__(self, embedding_service_url: str, timeout_seconds: int = 30, embedding_model_id: str = "") -> None:
         self.embedding_service_url = embedding_service_url.rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.embedding_model_id = embedding_model_id
 
     def encode(self, texts: list[str], normalize_embeddings: bool = True, convert_to_numpy: bool = True) -> np.ndarray:
         if len(texts) != 1:
             raise ValueError("RemoteEmbeddingClient supports exactly one query at a time")
-        payload = json.dumps({"text": texts[0]}, separators=(",", ":")).encode("utf-8")
+        body = {"text": texts[0]}
+        if self.embedding_model_id:
+            body["model_id"] = self.embedding_model_id
+        payload = json.dumps(body, separators=(",", ":")).encode("utf-8")
         req = request.Request(
             self.embedding_service_url,
             data=payload,
@@ -77,11 +81,16 @@ class TurboVecHybridRetriever:
         model_name: str,
         embedding_service_url: str = "",
         embedding_timeout_seconds: int = 30,
+        embedding_model_id: str = "",
     ) -> "TurboVecHybridRetriever":
         from turbovec import IdMapIndex
 
         if embedding_service_url:
-            embedder = RemoteEmbeddingClient(embedding_service_url, timeout_seconds=embedding_timeout_seconds)
+            embedder = RemoteEmbeddingClient(
+                embedding_service_url,
+                timeout_seconds=embedding_timeout_seconds,
+                embedding_model_id=embedding_model_id,
+            )
         else:
             from sentence_transformers import SentenceTransformer
 

@@ -40,6 +40,14 @@ The benchmark reports `precision@k`, `recall@k`, `mrr@k`, `ndcg@k`, `full_suppor
 Run the local embedding service plus Elasticsearch, Redis, FastAPI, and the React/Vite dashboard together:
 
 ```bash
+./start.sh
+```
+
+`start.sh` keeps PyTorch and SentenceTransformers on the host GPU, warms both the HotpotQA BGE model and the VimQA BKAI model through `http://localhost:8010`, then starts the Docker Compose runtime. This avoids installing GPU/PyTorch dependencies inside the API container while still letting Docker call the host embedding service at `host.docker.internal:8010`.
+
+The older PowerShell helper is still available for lightweight local development:
+
+```bash
 .\scripts\docker-dev.ps1
 ```
 
