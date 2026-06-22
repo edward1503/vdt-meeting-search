@@ -240,6 +240,40 @@ def test_run_benchmark_uses_qrels_file_with_query_file(monkeypatch, tmp_path):
     assert result['config']['qrels_file'] == str(qrels_file)
     assert result['results'][0]['metrics']['recall@10'] == 1.0
 
+def test_run_benchmark_accepts_dataset_query_file_with_query_id_header(monkeypatch, tmp_path):
+    query_file = tmp_path / "queries.tsv"
+    qrels_file = tmp_path / "qrels.tsv"
+    query_file.write_text("query_id\tsource_query_id\tquery\nq1\tq1\tHà Nội là gì?\n", encoding="utf-8")
+    qrels_file.write_text("query_id\tdoc_id\trelevance\nq1\td1\t1\n", encoding="utf-8")
+
+    class FakeRetriever:
+        def search(self, query, method, top_k, candidate_k=100, rrf_k=60):
+            return [{"doc_id": "d1", "score": 1.0}]
+
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="vimqa/all",
+        index="idx",
+        methods=["es_bm25"],
+        top_k=10,
+        max_queries=None,
+        url="http://example.invalid",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=10,
+        rrf_k=60,
+        first_hop_k=5,
+        second_hop_k=10,
+        context_chars=256,
+        run_dir=tmp_path,
+        query_file=query_file,
+        qrels_file=qrels_file,
+    )
+
+    assert result["config"]["queries"] == 1
+    assert result["results"][0]["metrics"]["recall@10"] == 1.0
+
 
 def test_method_mapping_accepts_turbovec_methods():
     assert benchmark_es.classify_method("es_bm25") == "es"
@@ -283,3 +317,67 @@ def test_run_benchmark_with_query_and_qrels_files_does_not_load_ir_dataset(monke
 
     assert result["config"]["queries"] == 1
     assert result["results"][0]["metrics"]["recall@10"] == 1.0
+
+def test_run_benchmark_dispatches_tv_two_hop_bridge_rrf(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeDataset:
+        def queries_iter(self):
+            yield SimpleNamespace(query_id="q1", text="query")
+
+        def qrels_iter(self):
+            yield SimpleNamespace(query_id="q1", doc_id="d1", relevance=1)
+
+    class FakeRetriever:
+        def search_two_hop_bridge_rrf(self, query, top_k, hop1_top_k, hop2_top_k, beam_size, max_bridge_terms, candidate_k, rrf_k):
+            calls.append(
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "hop1_top_k": hop1_top_k,
+                    "hop2_top_k": hop2_top_k,
+                    "beam_size": beam_size,
+                    "max_bridge_terms": max_bridge_terms,
+                    "candidate_k": candidate_k,
+                    "rrf_k": rrf_k,
+                }
+            )
+            return [{"doc_id": "d1", "score": 1.0, "chain_rank": 1, "chain_doc_ids": ["d1"], "hop": 1}]
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: FakeDataset())
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["tv_two_hop_bridge_rrf"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=20,
+        rrf_k=7,
+        first_hop_k=3,
+        second_hop_k=4,
+        context_chars=128,
+        run_dir=tmp_path,
+        beam_size=2,
+        max_bridge_terms=6,
+    )
+
+    assert calls == [
+        {
+            "query": "query",
+            "top_k": 10,
+            "hop1_top_k": 3,
+            "hop2_top_k": 4,
+            "beam_size": 2,
+            "max_bridge_terms": 6,
+            "candidate_k": 20,
+            "rrf_k": 7,
+        }
+    ]
+    assert result["config"]["beam_size"] == 2
+    assert result["config"]["max_bridge_terms"] == 6
+    assert result["results"][0]["metrics"]["chain_recall@1"] == 1.0

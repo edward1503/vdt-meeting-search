@@ -1,4 +1,4 @@
-import type { BenchmarkResult, Query } from '@/src/types';
+import type { BenchmarkResult, DatasetListResponse, DatasetProfile, Query } from '@/src/types';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '');
 
@@ -12,6 +12,19 @@ export interface SearchResult {
   source: string;
   hop: number;
   is_support?: boolean;
+  author?: string;
+  created_at?: string;
+  modified_at?: string;
+  source_split?: string;
+  answer?: string;
+}
+
+export interface SearchFilters {
+  author?: string;
+  created_at_from?: string;
+  created_at_to?: string;
+  modified_at_from?: string;
+  modified_at_to?: string;
 }
 
 export interface SearchSupportSummary {
@@ -25,11 +38,15 @@ export interface SearchSupportSummary {
 }
 
 export interface SearchResponse {
+  dataset_id?: string;
   query_id?: string | null;
   query: string;
   method: string;
+  requested_method?: string;
   top_k: number;
   latency_ms: number;
+  metadata_filters?: SearchFilters;
+  metadata_filter_scope?: 'hard_prefilter';
   support?: SearchSupportSummary;
   results: SearchResult[];
 }
@@ -44,6 +61,7 @@ export interface HistoryDoc {
 
 export interface HistoryEntry {
   id: number;
+  dataset_id?: string;
   created_at: string;
   query: string;
   method: string;
@@ -59,17 +77,34 @@ export interface StatsResponse {
   index: string;
   methods: string[];
   dataset_id?: string;
+  dataset_profile?: DatasetProfile;
+  primary_metric?: string;
   embedding_model?: string;
   embedding_service_url?: string;
   num_candidates?: number;
   search_cache_ttl_seconds?: number;
   history_db_path?: string;
   default_search_method?: string;
-  turbovec_index_path?: string;
-  turbovec_dim?: number;
-  turbovec_bit_width?: number;
+  turbovec_index_path?: string | null;
+  turbovec_dim?: number | null;
+  turbovec_bit_width?: number | null;
   runtime_profile?: string;
   corpus_doc_count?: number | null;
+  benchmark_query_count?: number | null;
+}
+
+export interface EmbeddingHealthResponse {
+  dataset_id: string;
+  model_id: string;
+  model: string;
+  expected_dim: number | null;
+  loaded_dim: number | null;
+  status: 'ready' | 'warming' | 'offline' | 'not_configured';
+  service_url: string;
+  device?: string | null;
+  torch_cuda_available?: boolean;
+  loaded_models?: Record<string, number>;
+  error?: string;
 }
 
 interface ApiQuery {
@@ -77,6 +112,8 @@ interface ApiQuery {
   query: string;
   support_doc_ids: string[];
   support_doc_count: number;
+  answer?: string;
+  split?: string;
 }
 
 interface ApiBenchmarkResult {
@@ -136,10 +173,22 @@ export async function getHealth(): Promise<{ status: string }> {
 }
 
 export async function getStats(): Promise<StatsResponse> {
-  return apiFetch('/stats');
+  return getDatasetStats('hotpotqa');
 }
 
-export async function getQueries({ limit = 10, offset = 0, search = '' }: { limit?: number; offset?: number; search?: string } = {}): Promise<QueryPage> {
+export async function getDatasets(): Promise<DatasetListResponse> {
+  return apiFetch('/datasets');
+}
+
+export async function getDatasetStats(datasetId: string): Promise<StatsResponse> {
+  return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/stats`);
+}
+
+export async function getDatasetEmbeddingHealth(datasetId: string): Promise<EmbeddingHealthResponse> {
+  return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/embedding-health`);
+}
+
+export async function getDatasetQueries(datasetId: string, { limit = 10, offset = 0, search = '' }: { limit?: number; offset?: number; search?: string } = {}): Promise<QueryPage> {
   const params = new URLSearchParams({
     limit: String(limit),
     offset: String(offset),
@@ -147,7 +196,29 @@ export async function getQueries({ limit = 10, offset = 0, search = '' }: { limi
   const trimmedSearch = search.trim();
   if (trimmedSearch) params.set('search', trimmedSearch);
 
-  const payload = await apiFetch<{ count: number; total: number; limit: number; offset: number; queries: ApiQuery[] }>(`/queries?${params.toString()}`);
+  const payload = await apiFetch<{ count: number; total: number; limit: number; offset: number; queries: ApiQuery[] }>(`/datasets/${encodeURIComponent(datasetId)}/queries?${params.toString()}`);
+  return mapQueryPage(payload);
+}
+
+export async function getQueries(params: { limit?: number; offset?: number; search?: string } = {}): Promise<QueryPage> {
+  return getDatasetQueries('hotpotqa', params);
+}
+
+export async function getDatasetBenchmark(datasetId: string): Promise<BenchmarkDashboard> {
+  const payload = await apiFetch<ApiBenchmarkPayload>(`/datasets/${encodeURIComponent(datasetId)}/benchmarks`);
+  const current = payload.current ?? { title: 'Current Benchmark', subtitle: '', config: {}, results: payload.results ?? [] };
+  const legacy = payload.legacy ?? { title: 'Legacy Benchmark', subtitle: '', config: {}, results: [] };
+  return {
+    current: mapBenchmarkSection(current, datasetId === 'vimqa' ? 'VimQA Retrieval Benchmark' : 'Current Full-Corpus Benchmark'),
+    legacy: mapBenchmarkSection(legacy, 'Legacy Nano / Elasticsearch Benchmarks'),
+  };
+}
+
+export async function getBenchmark(): Promise<BenchmarkDashboard> {
+  return getDatasetBenchmark('hotpotqa');
+}
+
+function mapQueryPage(payload: { count: number; total: number; limit: number; offset: number; queries: ApiQuery[] }): QueryPage {
   return {
     count: payload.count,
     total: payload.total,
@@ -159,16 +230,6 @@ export async function getQueries({ limit = 10, offset = 0, search = '' }: { limi
       docs: row.support_doc_ids,
       status: 'processed',
     })),
-  };
-}
-
-export async function getBenchmark(): Promise<BenchmarkDashboard> {
-  const payload = await apiFetch<ApiBenchmarkPayload>('/benchmark');
-  const current = payload.current ?? { title: 'Current Benchmark', subtitle: '', config: {}, results: payload.results ?? [] };
-  const legacy = payload.legacy ?? { title: 'Legacy Benchmark', subtitle: '', config: {}, results: [] };
-  return {
-    current: mapBenchmarkSection(current, 'Current Full-Corpus Benchmark'),
-    legacy: mapBenchmarkSection(legacy, 'Legacy Nano / Elasticsearch Benchmarks'),
   };
 }
 
@@ -195,17 +256,25 @@ function mapBenchmarkSection(section: ApiBenchmarkSection, fallbackTitle: string
   };
 }
 
-export async function searchHotpotQA(query: string, method: string, topK: number, queryId?: string): Promise<SearchResponse> {
-  return apiFetch('/search', {
+export async function searchDataset(datasetId: string, query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}): Promise<SearchResponse> {
+  return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/search`, {
     method: 'POST',
-    body: JSON.stringify({ query_id: queryId, query, method, top_k: topK }),
+    body: JSON.stringify({ query_id: queryId, query, method, top_k: topK, ...filters }),
   });
+}
+
+export async function searchHotpotQA(query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}): Promise<SearchResponse> {
+  return searchDataset('hotpotqa', query, method, topK, queryId, filters);
 }
 
 function methodLabel(method: string): string {
   switch (method) {
     case 'es_bm25':
       return 'Keyword baseline';
+    case 'es_dense':
+      return 'Elasticsearch dense vector';
+    case 'es_hybrid':
+      return 'Elasticsearch BM25 + dense RRF';
     case 'tv_dense':
       return 'TurboVec dense retrieval';
     case 'tv_hybrid':

@@ -27,8 +27,26 @@ def test_build_search_cache_key_is_stable_and_scoped() -> None:
         top_k=10,
         query_id="q1",
     )
+    key_e = build_search_cache_key(
+        dataset_id="vimqa",
+        index="hotpotqa_nano_current",
+        model="bkai-foundation-models/vietnamese-bi-encoder",
+        query="What occupations do both Ian Hunter and Rob Thomas have?",
+        method="tv_hybrid",
+        top_k=10,
+    )
+    key_f = build_search_cache_key(
+        dataset_id="hotpotqa",
+        index="hotpotqa_nano_current",
+        model="BAAI/bge-small-en-v1.5",
+        query="What occupations do both Ian Hunter and Rob Thomas have?",
+        method="tv_hybrid",
+        top_k=10,
+    )
 
     assert key_a == key_b
-    assert key_a.startswith("search:v2:")
+    assert key_a.startswith("search:v3:")
     assert key_a != key_c
     assert key_a != key_d
+    assert key_a != key_e
+    assert key_a == key_f

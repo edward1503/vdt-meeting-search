@@ -13,6 +13,8 @@ class SearchHit:
     rank: int
     method: str
     hop: int = 1
+    chain_rank: int | None = None
+    chain_doc_ids: tuple[str, ...] = ()
 
 
 class Retriever(Protocol):

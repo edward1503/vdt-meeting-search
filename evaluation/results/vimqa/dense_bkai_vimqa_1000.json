@@ -1,0 +1,83 @@
+{
+  "config": {
+    "dataset_id": "vimqa/all",
+    "index": "vimqa_all_dense_bkai_current",
+    "methods": [
+      "es_bm25",
+      "es_dense",
+      "es_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": 1000,
+    "model_name": "bkai-foundation-models/vietnamese-bi-encoder",
+    "num_candidates": 500,
+    "candidate_k": 50,
+    "queries": 1000,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": "evaluation\\results\\vimqa\\vimqa_queries.tsv",
+    "qrels_file": "evaluation\\results\\vimqa\\vimqa_qrels.tsv"
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.0987,
+        "recall@10": 0.987,
+        "mrr@10": 0.9113,
+        "ndcg@10": 0.93,
+        "latency_p50_ms": 59.8943,
+        "latency_p95_ms": 96.5966,
+        "latency_p99_ms": 113.1131,
+        "qps": 16.3988,
+        "queries": 1000,
+        "full_support_recall@2": 0.932,
+        "full_support_recall@5": 0.969,
+        "full_support_recall@10": 0.987
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_bm25_vimqa_all_top10.trec"
+    },
+    {
+      "method": "es_dense",
+      "metrics": {
+        "precision@10": 0.0891,
+        "recall@10": 0.891,
+        "mrr@10": 0.7507,
+        "ndcg@10": 0.7852,
+        "latency_p50_ms": 83.8668,
+        "latency_p95_ms": 116.3407,
+        "latency_p99_ms": 131.1404,
+        "qps": 8.9515,
+        "queries": 1000,
+        "full_support_recall@2": 0.784,
+        "full_support_recall@5": 0.855,
+        "full_support_recall@10": 0.891
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_dense_vimqa_all_top10.trec"
+    },
+    {
+      "method": "es_hybrid",
+      "metrics": {
+        "precision@10": 0.0983,
+        "recall@10": 0.983,
+        "mrr@10": 0.8647,
+        "ndcg@10": 0.8935,
+        "latency_p50_ms": 179.4866,
+        "latency_p95_ms": 204.2746,
+        "latency_p99_ms": 218.8785,
+        "qps": 5.4791,
+        "queries": 1000,
+        "full_support_recall@2": 0.883,
+        "full_support_recall@5": 0.946,
+        "full_support_recall@10": 0.983
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_hybrid_vimqa_all_top10.trec"
+    }
+  ]
+}

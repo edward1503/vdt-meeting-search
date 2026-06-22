@@ -31,6 +31,8 @@ data/*.zip
 !evaluation/*.json
 !evaluation/results/*.json
 !evaluation/results/hotpotqa_full/*.json
+!evaluation/results/hotpotqa_full/**/*.json
+!evaluation/results/vimqa/*.json
 !docs/*.json
 
 # Local generated indexes/cache

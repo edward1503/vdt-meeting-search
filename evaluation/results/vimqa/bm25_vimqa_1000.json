@@ -1,0 +1,45 @@
+{
+  "config": {
+    "dataset_id": "vimqa/all",
+    "index": "vimqa_all_bm25_current",
+    "methods": [
+      "es_bm25"
+    ],
+    "top_k": 10,
+    "max_queries": 1000,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 1000,
+    "candidate_k": 100,
+    "queries": 1000,
+    "rrf_k": 60,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": "evaluation\\results\\vimqa\\vimqa_queries.tsv",
+    "qrels_file": "evaluation\\results\\vimqa\\vimqa_qrels.tsv"
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.0987,
+        "recall@10": 0.987,
+        "mrr@10": 0.9113,
+        "ndcg@10": 0.93,
+        "latency_p50_ms": 52.3291,
+        "latency_p95_ms": 63.28,
+        "latency_p99_ms": 74.1184,
+        "qps": 18.7042,
+        "queries": 1000,
+        "full_support_recall@2": 0.932,
+        "full_support_recall@5": 0.969,
+        "full_support_recall@10": 0.987
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_bm25_vimqa_all_top10.trec"
+    }
+  ]
+}

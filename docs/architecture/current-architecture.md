@@ -1,6 +1,6 @@
 # Current Architecture
 
-Last updated: 2026-06-16
+Last updated: 2026-06-21
 
 This document describes the current architecture of `vdt-meeting-search`. The active system is a full-corpus HotpotQA retrieval demo: Elasticsearch serves BM25 and document hydration, TurboVec serves dense retrieval over the full 5.23M-document corpus, Redis caches search responses, and the React dashboard runs against `beir/hotpotqa/dev` queries/qrels.
 
@@ -21,7 +21,7 @@ HotpotQA full corpus + beir/hotpotqa/dev queries
 | Ingest | `scripts/es_hotpotqa.py` | Create index, encode embeddings, bulk ingest, validate count, search CLI |
 | Retrieval | `src/retrieval/elasticsearch_retriever.py`, `src/retrieval/turbovec_retriever.py` | BM25, TurboVec dense, TurboVec hybrid RRF, filtered TurboVec hybrid |
 | Evaluation | `src/evaluation/benchmark_es.py`, `src/evaluation/metrics.py` | Run benchmarks, write TREC runs, compute metrics |
-| API | `src/api/main.py` | FastAPI endpoints for health, stats, queries, benchmark, history, search |
+| API | `src/api/main.py`, `src/api/dataset_profiles.py` | FastAPI endpoints for health, dataset profiles, stats, queries, benchmark, history, search |
 | Cache | Redis | Cache repeated `/search` responses by query/method/top-k/index |
 | History | SQLite | Store search history and top returned documents |
 | Frontend | `frontend/` | React/Vite dashboard calling the FastAPI API |
@@ -155,6 +155,11 @@ The FastAPI app is in `src/api/main.py`.
 | Endpoint | Method | Role |
 |---|---|---|
 | `/health` | GET | Health check |
+| `/datasets` | GET | Dataset profile discovery for HotpotQA and VimQA |
+| `/datasets/{dataset_id}/stats` | GET | Dataset-scoped runtime config |
+| `/datasets/{dataset_id}/queries` | GET | Dataset-scoped query examples and gold docs |
+| `/datasets/{dataset_id}/benchmarks` | GET | Dataset-scoped benchmark dashboard payload |
+| `/datasets/{dataset_id}/search` | POST | Dataset-scoped retrieval search |
 | `/stats` | GET | Runtime config: backend, index, dataset, model, cache, history path |
 | `/queries` | GET | Query examples and support docs from `ir_datasets` or TSV fallback |
 | `/benchmark` | GET | Benchmark dashboard payload with current full-corpus project-progress results plus legacy nano history |
@@ -176,6 +181,14 @@ Search request shape:
 
 When `REDIS_URL` is set, `/search` responses are cached by `index + query_id + query + method + top_k`. If Redis is unavailable, the API falls back to direct retrieval. `/search` responses include a `support` summary and per-result `is_support` flag when qrels are available.
 
+Dataset-scoped search cache keys include `dataset_id + index + model + query_id + query + method + top_k + metadata_filters`, so HotpotQA and VimQA queries do not collide in Redis. The legacy `/stats`, `/queries`, `/benchmark`, and `/search` endpoints delegate to the `hotpotqa` profile and remain compatible during frontend migration.
+
+### Dataset Profiles
+
+The API treats datasets as runtime profiles. `src/api/dataset_profiles.py` declares `hotpotqa` and `vimqa` profiles with index aliases, methods, default method, language, dense backend, embedding model, query/qrels files, benchmark files, readiness, metadata support, and primary metric.
+
+HotpotQA keeps TurboVec methods: `es_bm25`, `tv_dense`, `tv_hybrid`, and `tv_filtered_hybrid`. VimQA uses Elasticsearch BM25/dense/hybrid over the BKAI dense index and defaults to `es_bm25`. The UI remains a query/read-only inspection surface; Indexes and Metadata views expose profile/runtime information without managing indexes or metadata schemas.
+
 `src/api/history.py` stores search history in SQLite. The default path is `data/query_history.sqlite3`; in Docker Compose it is backed by the `history_data` volume.
 
 ## 8. Frontend Layer
@@ -188,9 +201,11 @@ The frontend is a React/Vite app in `frontend/`.
 | Search | `SearchView` | Run a query by method/top-k |
 | Queries | `QueriesView` | Show query examples and support docs |
 | Benchmark | `BenchmarkView` | Show benchmark metrics |
+| Indexes | `IndexesView` | Show active dataset index/profile artifacts |
+| Metadata | `MetadataView` | Show metadata filter support by dataset |
 | History | `HistoryView` | Review search history and run a query again |
 
-The API client is `frontend/src/lib/api.ts`. The default API base URL is `/api`, matching the Docker/Vite proxy setup.
+The API client is `frontend/src/lib/api.ts`. The default API base URL is `/api`, matching the Docker/Vite proxy setup. The frontend loads `GET /datasets` on startup, stores `activeDatasetId`, and routes Search, Queries, Benchmarks, Status, Indexes, Metadata, and History run-again actions through the active dataset profile.
 
 ## 9. Docker Development Stack
 
@@ -231,15 +246,17 @@ Runtime settings live in `src/core/config.py`.
 
 ### HotpotQA
 
-HotpotQA is the officially integrated dataset in the current code path. Documents come from the full `beir/hotpotqa` corpus; API examples and support labels use `beir/hotpotqa/dev`. Benchmark qrels come from `ir_datasets` unless `--qrels-file` is provided. API `/queries` prefers query/qrels data from `ir_datasets` and falls back to `evaluation/results/hotpotqa_full_dev_queries.tsv` in Docker.
+HotpotQA is the default dataset profile. Documents come from the full `beir/hotpotqa` corpus; API examples and support labels use `beir/hotpotqa/dev` or the checked-in `evaluation/results/hotpotqa_full_dev_queries.tsv` fallback. HotpotQA search uses `hotpotqa_full_bm25_current` for BM25 and the full TurboVec `.tvim` artifact for dense/hybrid retrieval.
 
 ### VimQA
 
-VimQA currently lives at:
+VimQA currently has a first-class runtime profile backed by Sprint 4 artifacts:
 
 ```text
-docs/data/vimqa/train_vimqa.json
-docs/data/vimqa/test_vimqa.json
+evaluation/results/vimqa/vimqa_queries.tsv
+evaluation/results/vimqa/vimqa_qrels.tsv
+evaluation/results/vimqa/bm25_vimqa_full.json
+evaluation/results/vimqa/dense_bkai_vimqa_full.json
 ```
 
 Observed schema:
@@ -252,27 +269,19 @@ Observed schema:
 }
 ```
 
-Current status:
-
-- No native `VimQADataset` adapter exists yet.
-- No native VimQA staging script exists yet.
-- The benchmark runner does not accept `--dataset-type vimqa` yet.
-- VimQA can be tested manually by converting `context` into docs, `question` into queries, and generating qrels TSV, but that is not yet first-class architecture.
-
-VimQA is currently a single-context QA dataset, not a BEIR-style retrieval dataset with separate corpus/query/qrels files. Running retrieval evaluation on VimQA requires defining a retrieval proxy explicitly.
+VimQA is exposed through `/datasets/vimqa/...`. It remains a single-context QA retrieval proxy, so benchmark UI emphasizes `recall@10`, `mrr@10`, and `ndcg@10` rather than HotpotQA full-support metrics. Metadata filters are displayed as unsupported for VimQA in Sprint 4.
 
 ## 12. Known Limitations
 
-1. The dataset layer is still hard-coded around HotpotQA and `ir_datasets`.
-2. The benchmark runner still depends on `ir_datasets` for standard HotpotQA runs.
-3. VimQA is not isolated as a first-class dataset yet.
-4. API labels and dashboard copy are still HotpotQA-oriented.
-5. The default embedding model is English BGE small, not optimized for Vietnamese.
-6. First TurboVec load after API reload can be slower than warm searches because the full `.tvim` artifact is opened on demand.
+1. The benchmark runner still depends on `ir_datasets` for standard HotpotQA runs.
+2. VimQA is implemented as a retrieval proxy over prepared TSV/index/benchmark artifacts, not a generic dataset adapter.
+3. Metadata filters are unsupported for VimQA in Sprint 4.
+4. The default HotpotQA embedding model is English BGE small; VimQA uses the BKAI dense Elasticsearch index rather than TurboVec.
+5. First TurboVec load after API reload can be slower than warm searches because the full `.tvim` artifact is opened on demand.
 
-## 13. Recommended Direction For Dataset Isolation
+## 13. Recommended Direction After Dataset Profiles
 
-To isolate HotpotQA and VimQA, add a dataset adapter layer:
+Dataset profiles now isolate HotpotQA and VimQA at the API/UI runtime boundary. A later cleanup can move prepared artifacts behind a dataset adapter layer:
 
 ```text
 RetrievalDataset interface
@@ -293,11 +302,12 @@ evaluation/runs/hotpotqa/...
 evaluation/runs/vimqa/...
 ```
 
-Elasticsearch indexes and aliases should be separate too:
+Elasticsearch indexes and aliases should remain separate:
 
 ```text
-hotpotqa_full_bm25_v1   -> hotpotqa_full_bm25_current
-vimqa_test_v1           -> vimqa_test_current
+hotpotqa_full_bm25_v1      -> hotpotqa_full_bm25_current
+vimqa_all_bm25_current     -> VimQA lexical profile
+vimqa_all_dense_bkai_current -> VimQA dense profile
 ```
 
-This preserves the existing retrieval methods while removing the need to use HotpotQA as a dummy dataset when benchmarking VimQA.
+The next architecture step is to make benchmark/staging adapters as explicit as runtime profiles, not to split the API or UI into separate services.

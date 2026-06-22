@@ -14,6 +14,24 @@ def test_build_bm25_index_body_excludes_dense_vector_and_keeps_numeric_id():
     assert "embedding" not in props
     assert body["settings"]["number_of_shards"] == 3
 
+def test_bm25_index_body_can_include_metadata_fields():
+    body = build_bm25_index_body(shards=2, include_metadata=True)
+
+    props = body["mappings"]["properties"]
+    assert props["author"] == {"type": "keyword"}
+    assert props["created_at"] == {"type": "date"}
+    assert props["modified_at"] == {"type": "date"}
+    assert props["source_split"] == {"type": "keyword"}
+    assert props["answer"] == {"type": "keyword"}
+    assert body["settings"]["number_of_shards"] == 2
+
+def test_build_index_body_supports_optional_vimqa_metadata_fields():
+    body = build_index_body(dims=768)
+    properties = body["mappings"]["properties"]
+
+    assert properties["source_split"] == {"type": "keyword"}
+    assert properties["answer"] == {"type": "keyword"}
+
 
 def test_bm25_bulk_action_uses_numeric_id_and_excludes_embedding_text():
     row = {
@@ -33,6 +51,47 @@ def test_bm25_bulk_action_uses_numeric_id_and_excludes_embedding_text():
     assert action["numeric_id"] == 7
     assert "embedding" not in action
     assert "embedding_text" not in action
+
+def test_bm25_bulk_action_copies_metadata_fields_when_present():
+    action = bm25_bulk_action(
+        "idx",
+        {
+            "numeric_id": 7,
+            "doc_id": "d7",
+            "title": "T",
+            "text": "Body",
+            "url": "",
+            "content": "T\nBody",
+            "author": "Nguyen An",
+            "created_at": "2024-01-01",
+            "modified_at": "2024-01-02",
+            "source_split": "train,test",
+            "answer": "Hà Nội",
+        },
+    )
+
+    assert action["author"] == "Nguyen An"
+    assert action["created_at"] == "2024-01-01"
+    assert action["modified_at"] == "2024-01-02"
+    assert action["source_split"] == "train,test"
+    assert action["answer"] == "Hà Nội"
+
+def test_bulk_action_preserves_optional_vimqa_metadata_fields():
+    action = bulk_action(
+        "idx",
+        {
+            "doc_id": "vimqa_ctx_1",
+            "title": "VimQA context",
+            "text": "Hà Nội là thủ đô Việt Nam.",
+            "content": "Hà Nội là thủ đô Việt Nam.",
+            "source_split": "train,test",
+            "answer": "Hà Nội",
+        },
+        [0.1, 0.2],
+    )
+
+    assert action["source_split"] == "train,test"
+    assert action["answer"] == "Hà Nội"
 
 def test_bm25_search_preserves_numeric_id_from_source():
     class FakeES:
@@ -71,6 +130,66 @@ def test_bm25_search_preserves_numeric_id_from_source():
             "source": "bm25",
         }
     ]
+
+def test_build_bm25_query_applies_metadata_filters_in_filter_context():
+    body = build_bm25_query(
+        "Arthur",
+        10,
+        metadata_filters={
+            "author": "Nguyen An",
+            "created_at_from": "2024-01-01",
+            "created_at_to": "2024-01-31",
+            "modified_at_from": "2024-01-01",
+            "modified_at_to": "2024-02-15",
+        },
+    )
+
+    assert body["query"]["bool"]["must"] == [
+        {"multi_match": {"query": "Arthur", "fields": ["title^2", "content"]}}
+    ]
+    assert {"term": {"author": "Nguyen An"}} in body["query"]["bool"]["filter"]
+    assert {"range": {"created_at": {"gte": "2024-01-01", "lte": "2024-01-31"}}} in body["query"]["bool"]["filter"]
+    assert {"range": {"modified_at": {"gte": "2024-01-01", "lte": "2024-02-15"}}} in body["query"]["bool"]["filter"]
+    assert {"author", "created_at", "modified_at"}.issubset(set(body["_source"]))
+    assert {"source_split", "answer"}.issubset(set(body["_source"]))
+
+def test_bm25_search_accepts_metadata_filters_and_returns_metadata_fields():
+    captured = {}
+
+    class FakeES:
+        def search(self, index, body):
+            captured["index"] = index
+            captured["body"] = body
+            return {
+                "hits": {
+                    "hits": [
+                        {
+                            "_id": "d1",
+                            "_score": 2.0,
+                            "_source": {
+                                "numeric_id": 1,
+                                "doc_id": "d1",
+                                "title": "T",
+                                "text": "Body",
+                                "url": "",
+                                "author": "Nguyen An",
+                                "created_at": "2024-01-01",
+                                "modified_at": "2024-01-02",
+                            },
+                        }
+                    ]
+                }
+            }
+
+    retriever = ElasticsearchRetriever(es=FakeES(), index="idx", model_name="model")
+
+    hits = retriever.search("Arthur", "bm25", 1, metadata_filters={"author": "Nguyen An"})
+
+    assert captured["index"] == "idx"
+    assert captured["body"]["query"]["bool"]["filter"] == [{"term": {"author": "Nguyen An"}}]
+    assert hits[0]["author"] == "Nguyen An"
+    assert hits[0]["created_at"] == "2024-01-01"
+    assert hits[0]["modified_at"] == "2024-01-02"
 
 def test_build_index_body_has_text_and_vector_fields():
     body = build_index_body(dims=384)
