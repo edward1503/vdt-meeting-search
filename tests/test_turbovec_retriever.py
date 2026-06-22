@@ -2,7 +2,112 @@
 
 import numpy as np
 
+from src.retrieval.turbovec_retriever import ElasticsearchNumericDocStore
 from src.retrieval.turbovec_retriever import TurboVecHybridRetriever
+
+
+def test_numeric_docstore_hydration_includes_metadata_fields():
+    captured = {}
+
+    class FakeES:
+        def search(self, index, body):
+            captured['index'] = index
+            captured['body'] = body
+            return {
+                'hits': {
+                    'hits': [
+                        {
+                            '_id': 'd1',
+                            '_source': {
+                                'numeric_id': 1,
+                                'doc_id': 'd1',
+                                'title': 'T',
+                                'text': 'Body',
+                                'url': '',
+                                'author': 'Nguyen An',
+                                'created_at': '2024-01-01',
+                                'modified_at': '2024-01-02',
+                            },
+                        }
+                    ]
+                }
+            }
+
+    docstore = ElasticsearchNumericDocStore(FakeES(), 'idx')
+
+    docs = docstore.hydrate_by_numeric_ids([1])
+
+    assert {'author', 'created_at', 'modified_at'}.issubset(set(captured['body']['_source']))
+    assert docs[0]['author'] == 'Nguyen An'
+    assert docs[0]['created_at'] == '2024-01-01'
+    assert docs[0]['modified_at'] == '2024-01-02'
+
+
+def test_tv_filtered_hybrid_passes_metadata_filters_to_bm25():
+    captured = {}
+
+    class FakeESRetriever:
+        def search(self, query, method, top_k, candidate_k=100, rrf_k=60, metadata_filters=None):
+            captured['metadata_filters'] = metadata_filters
+            return [{'doc_id': 'd1', 'numeric_id': 1, 'title': 'A', 'source': 'bm25'}]
+
+    class FakeTVIndex:
+        def search(self, queries, k, allowlist=None):
+            return np.array([[0.9]], dtype=np.float32), np.array([[1]], dtype=np.uint64)
+
+    class FakeEmbedder:
+        def encode(self, texts, normalize_embeddings, convert_to_numpy):
+            return np.array([[1.0, 0.0]], dtype=np.float32)
+
+    class FakeDocStore:
+        def hydrate_by_numeric_ids(self, numeric_ids):
+            return [{'doc_id': 'd1', 'numeric_id': 1, 'title': 'A'}]
+
+    retriever = TurboVecHybridRetriever(
+        bm25_retriever=FakeESRetriever(),
+        tv_index=FakeTVIndex(),
+        embedder=FakeEmbedder(),
+        docstore=FakeDocStore(),
+    )
+
+    retriever.search(
+        'query',
+        method='tv_filtered_hybrid',
+        top_k=1,
+        bm25_k=5,
+        dense_k=5,
+        metadata_filters={'author': 'Nguyen An'},
+    )
+
+    assert captured['metadata_filters'] == {'author': 'Nguyen An'}
+
+
+def test_tv_filtered_hybrid_with_metadata_filters_returns_empty_when_allowlist_is_empty():
+    class FakeESRetriever:
+        def search(self, query, method, top_k, candidate_k=100, rrf_k=60, metadata_filters=None):
+            return [{'doc_id': 'd1', 'title': 'A', 'source': 'bm25'}]
+
+    class FakeTVIndex:
+        def search(self, queries, k, allowlist=None):
+            raise AssertionError('dense search should not run when metadata-filtered allowlist is empty')
+
+    retriever = TurboVecHybridRetriever(
+        bm25_retriever=FakeESRetriever(),
+        tv_index=FakeTVIndex(),
+        embedder=object(),
+        docstore=object(),
+    )
+
+    hits = retriever.search(
+        'query',
+        method='tv_filtered_hybrid',
+        top_k=2,
+        bm25_k=2,
+        dense_k=5,
+        metadata_filters={'author': 'Nguyen An'},
+    )
+
+    assert hits == []
 
 
 def test_tv_hybrid_fuses_bm25_and_dense_and_preserves_hydrated_order():
@@ -230,3 +335,52 @@ def test_elasticsearch_retriever_remote_embedding_includes_model_id(monkeypatch)
     assert retriever._embed_query("xin chao") == [0.1, 0.2, 0.3]
     assert captured["body"] == {"text": "xin chao", "model_id": "vimqa"}
     assert captured["timeout"] == 11
+
+def test_tv_two_hop_bridge_rrf_builds_bridge_queries_and_returns_chain_metadata(monkeypatch):
+    retriever = TurboVecHybridRetriever(
+        bm25_retriever=object(),
+        tv_index=object(),
+        embedder=object(),
+        docstore=object(),
+    )
+    calls = []
+
+    def fake_search(query, method, top_k, bm25_k=100, dense_k=100, rrf_k=60, candidate_k=None, **kwargs):
+        calls.append({"query": query, "method": method, "top_k": top_k, "candidate_k": candidate_k, "rrf_k": rrf_k})
+        if len(calls) == 1:
+            return [
+                {"doc_id": "bridge", "numeric_id": 1, "title": "Bridge Title", "text": "alpha beta gamma", "score": 0.9, "source": "bm25+dense"},
+                {"doc_id": "other", "numeric_id": 2, "title": "Other", "text": "delta", "score": 0.8, "source": "bm25+dense"},
+            ]
+        return [
+            {"doc_id": "answer", "numeric_id": 3, "title": "Answer", "text": "answer text", "score": 0.7, "source": "bm25+dense"},
+            {"doc_id": "bridge", "numeric_id": 1, "title": "Bridge Title", "text": "duplicate", "score": 0.6, "source": "bm25+dense"},
+        ]
+
+    monkeypatch.setattr(retriever, "search", fake_search)
+
+    hits = retriever.search_two_hop_bridge_rrf(
+        "original question",
+        top_k=3,
+        hop1_top_k=2,
+        hop2_top_k=2,
+        beam_size=1,
+        max_bridge_terms=2,
+        candidate_k=20,
+        rrf_k=30,
+    )
+
+    assert calls[0] == {"query": "original question", "method": "tv_hybrid", "top_k": 2, "candidate_k": 20, "rrf_k": 30}
+    assert calls[1]["query"] == "original question Bridge Title alpha beta"
+    assert [hit["doc_id"] for hit in hits[:2]] == ["bridge", "answer"]
+    assert hits[0]["chain_rank"] == 1
+    assert hits[0]["chain_doc_ids"] == ["bridge", "answer"]
+    assert hits[1]["hop"] == 2
+
+def test_bridge_query_terms_skip_query_terms_and_dedupe():
+    retriever = TurboVecHybridRetriever(bm25_retriever=None, tv_index=None, embedder=None, docstore=None)
+    hit = {"title": "Bridge Bridge Title", "text": "original alpha alpha beta gamma"}
+
+    query = retriever._build_bridge_query("original question", hit, max_bridge_terms=3)
+
+    assert query == "original question Bridge Bridge Title alpha beta gamma"

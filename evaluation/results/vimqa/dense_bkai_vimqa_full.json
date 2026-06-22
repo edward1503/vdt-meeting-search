@@ -1,0 +1,64 @@
+{
+  "config": {
+    "dataset_id": "vimqa/all",
+    "index": "vimqa_all_dense_bkai_current",
+    "methods": [
+      "es_dense",
+      "es_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": null,
+    "model_name": "bkai-foundation-models/vietnamese-bi-encoder",
+    "num_candidates": 500,
+    "candidate_k": 50,
+    "queries": 9044,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": "evaluation\\results\\vimqa\\vimqa_queries.tsv",
+    "qrels_file": "evaluation\\results\\vimqa\\vimqa_qrels.tsv"
+  },
+  "results": [
+    {
+      "method": "es_dense",
+      "metrics": {
+        "precision@10": 0.0872,
+        "recall@10": 0.8716,
+        "mrr@10": 0.7272,
+        "ndcg@10": 0.7625,
+        "latency_p50_ms": 83.7323,
+        "latency_p95_ms": 115.0396,
+        "latency_p99_ms": 130.0254,
+        "qps": 10.5955,
+        "queries": 9044,
+        "full_support_recall@2": 0.7525,
+        "full_support_recall@5": 0.8313,
+        "full_support_recall@10": 0.8716
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_dense_vimqa_all_top10.trec"
+    },
+    {
+      "method": "es_hybrid",
+      "metrics": {
+        "precision@10": 0.0964,
+        "recall@10": 0.9644,
+        "mrr@10": 0.8277,
+        "ndcg@10": 0.8609,
+        "latency_p50_ms": 176.0548,
+        "latency_p95_ms": 206.3031,
+        "latency_p99_ms": 224.4562,
+        "qps": 1.2394,
+        "queries": 9044,
+        "full_support_recall@2": 0.8437,
+        "full_support_recall@5": 0.9225,
+        "full_support_recall@10": 0.9644
+      },
+      "run_file": "evaluation\\runs\\vimqa\\es_hybrid_vimqa_all_top10.trec"
+    }
+  ]
+}

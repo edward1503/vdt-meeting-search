@@ -1,0 +1,102 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "es_bm25",
+      "tv_dense",
+      "tv_hybrid",
+      "tv_filtered_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": null,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 50,
+    "candidate_k": 50,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": "artifacts\\hotpotqa_full\\paraphrase\\validated\\lexical_strong_200.tsv",
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.1175,
+        "recall@10": 0.5875,
+        "mrr@10": 0.6968,
+        "ndcg@10": 0.5589,
+        "latency_p50_ms": 104.9877,
+        "latency_p95_ms": 555.7445,
+        "latency_p99_ms": 926.3088,
+        "qps": 6.0279,
+        "queries": 200,
+        "full_support_recall@2": 0.195,
+        "full_support_recall@5": 0.29,
+        "full_support_recall@10": 0.34
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\paraphrase_final\\lexical_strong_200\\es_bm25_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_dense",
+      "metrics": {
+        "precision@10": 0.143,
+        "recall@10": 0.715,
+        "mrr@10": 0.8125,
+        "ndcg@10": 0.6809,
+        "latency_p50_ms": 466.8851,
+        "latency_p95_ms": 745.2094,
+        "latency_p99_ms": 1152.032,
+        "qps": 1.2171,
+        "queries": 200,
+        "full_support_recall@2": 0.3,
+        "full_support_recall@5": 0.42,
+        "full_support_recall@10": 0.495
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\paraphrase_final\\lexical_strong_200\\tv_dense_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.141,
+        "recall@10": 0.705,
+        "mrr@10": 0.8435,
+        "ndcg@10": 0.6953,
+        "latency_p50_ms": 642.713,
+        "latency_p95_ms": 2187.2581,
+        "latency_p99_ms": 3681.6889,
+        "qps": 1.1,
+        "queries": 200,
+        "full_support_recall@2": 0.315,
+        "full_support_recall@5": 0.435,
+        "full_support_recall@10": 0.48
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\paraphrase_final\\lexical_strong_200\\tv_hybrid_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_filtered_hybrid",
+      "metrics": {
+        "precision@10": 0.1275,
+        "recall@10": 0.6375,
+        "mrr@10": 0.7992,
+        "ndcg@10": 0.6395,
+        "latency_p50_ms": 197.9273,
+        "latency_p95_ms": 714.601,
+        "latency_p99_ms": 1791.4455,
+        "qps": 3.5409,
+        "queries": 200,
+        "full_support_recall@2": 0.265,
+        "full_support_recall@5": 0.355,
+        "full_support_recall@10": 0.395
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\paraphrase_final\\lexical_strong_200\\tv_filtered_hybrid_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

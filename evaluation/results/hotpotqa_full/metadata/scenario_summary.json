@@ -1,0 +1,228 @@
+{
+  "generated_at": "2026-06-21T09:33:07+00:00",
+  "metadata_dir": "artifacts\\hotpotqa_full\\metadata",
+  "synthetic": true,
+  "metadata_fields": [
+    "author",
+    "created_at",
+    "modified_at"
+  ],
+  "embedding_text_policy": "unchanged content-only text; synthetic metadata is not embedded",
+  "baseline_docs": 5233329,
+  "counted_docs": 5233329,
+  "scenario_count": 5,
+  "scenarios": [
+    {
+      "name": "content_only_anarchism",
+      "mode": "content_only",
+      "query": "Anarchism",
+      "method": "es_bm25",
+      "effective_method": "es_bm25",
+      "metadata_filter_scope": "none",
+      "filters": {},
+      "baseline_docs": 5233329,
+      "matched_docs": 5233329,
+      "narrowing_pct": 0.0,
+      "count_elapsed_ms": 94131.8344,
+      "latency_observation": "one-pass offline metadata count in milliseconds; search latency is covered by the US-S4-006 API smoke proof",
+      "sample_results": [
+        {
+          "doc_id": "12",
+          "numeric_id": 0,
+          "title": "Anarchism",
+          "author": "Nguyen An",
+          "created_at": "2024-01-01",
+          "modified_at": "2024-01-02"
+        },
+        {
+          "doc_id": "25",
+          "numeric_id": 1,
+          "title": "Autism",
+          "author": "Nguyen Binh",
+          "created_at": "2024-01-02",
+          "modified_at": "2024-01-03"
+        },
+        {
+          "doc_id": "39",
+          "numeric_id": 2,
+          "title": "Albedo",
+          "author": "Nguyen Chau",
+          "created_at": "2024-01-03",
+          "modified_at": "2024-01-04"
+        }
+      ]
+    },
+    {
+      "name": "author_nguyen_an",
+      "mode": "metadata_filtered",
+      "query": "Anarchism",
+      "method": "es_bm25",
+      "effective_method": "es_bm25",
+      "metadata_filter_scope": "hard_prefilter",
+      "filters": {
+        "author": "Nguyen An"
+      },
+      "baseline_docs": 5233329,
+      "matched_docs": 40886,
+      "narrowing_pct": 99.2187,
+      "count_elapsed_ms": 94131.8344,
+      "latency_observation": "one-pass offline metadata count in milliseconds; search latency is covered by the US-S4-006 API smoke proof",
+      "sample_results": [
+        {
+          "doc_id": "12",
+          "numeric_id": 0,
+          "title": "Anarchism",
+          "author": "Nguyen An",
+          "created_at": "2024-01-01",
+          "modified_at": "2024-01-02"
+        },
+        {
+          "doc_id": "844",
+          "numeric_id": 128,
+          "title": "Amsterdam",
+          "author": "Nguyen An",
+          "created_at": "2024-05-08",
+          "modified_at": "2024-05-10"
+        },
+        {
+          "doc_id": "1129",
+          "numeric_id": 256,
+          "title": "August 13",
+          "author": "Nguyen An",
+          "created_at": "2024-09-13",
+          "modified_at": "2024-09-13"
+        }
+      ]
+    },
+    {
+      "name": "created_january_2024",
+      "mode": "metadata_filtered",
+      "query": "Anarchism",
+      "method": "es_bm25",
+      "effective_method": "es_bm25",
+      "metadata_filter_scope": "hard_prefilter",
+      "filters": {
+        "created_at_from": "2024-01-01",
+        "created_at_to": "2024-01-31"
+      },
+      "baseline_docs": 5233329,
+      "matched_docs": 222239,
+      "narrowing_pct": 95.7534,
+      "count_elapsed_ms": 94131.8344,
+      "latency_observation": "one-pass offline metadata count in milliseconds; search latency is covered by the US-S4-006 API smoke proof",
+      "sample_results": [
+        {
+          "doc_id": "12",
+          "numeric_id": 0,
+          "title": "Anarchism",
+          "author": "Nguyen An",
+          "created_at": "2024-01-01",
+          "modified_at": "2024-01-02"
+        },
+        {
+          "doc_id": "25",
+          "numeric_id": 1,
+          "title": "Autism",
+          "author": "Nguyen Binh",
+          "created_at": "2024-01-02",
+          "modified_at": "2024-01-03"
+        },
+        {
+          "doc_id": "39",
+          "numeric_id": 2,
+          "title": "Albedo",
+          "author": "Nguyen Chau",
+          "created_at": "2024-01-03",
+          "modified_at": "2024-01-04"
+        }
+      ]
+    },
+    {
+      "name": "modified_mid_january_2024",
+      "mode": "metadata_filtered",
+      "query": "Anarchism",
+      "method": "es_bm25",
+      "effective_method": "es_bm25",
+      "metadata_filter_scope": "hard_prefilter",
+      "filters": {
+        "modified_at_from": "2024-01-10",
+        "modified_at_to": "2024-01-20"
+      },
+      "baseline_docs": 5233329,
+      "matched_docs": 60589,
+      "narrowing_pct": 98.8422,
+      "count_elapsed_ms": 94131.8344,
+      "latency_observation": "one-pass offline metadata count in milliseconds; search latency is covered by the US-S4-006 API smoke proof",
+      "sample_results": [
+        {
+          "doc_id": "309",
+          "numeric_id": 8,
+          "title": "An American in Paris",
+          "author": "Nguyen Huy",
+          "created_at": "2024-01-09",
+          "modified_at": "2024-01-10"
+        },
+        {
+          "doc_id": "316",
+          "numeric_id": 9,
+          "title": "Academy Award for Best Production Design",
+          "author": "Nguyen Khanh",
+          "created_at": "2024-01-10",
+          "modified_at": "2024-01-11"
+        },
+        {
+          "doc_id": "324",
+          "numeric_id": 10,
+          "title": "Academy Awards",
+          "author": "Nguyen Lan",
+          "created_at": "2024-01-11",
+          "modified_at": "2024-01-12"
+        }
+      ]
+    },
+    {
+      "name": "hybrid_author_created_january",
+      "mode": "metadata_content_hybrid",
+      "query": "Anarchism",
+      "method": "tv_hybrid",
+      "effective_method": "tv_filtered_hybrid",
+      "metadata_filter_scope": "hard_prefilter",
+      "filters": {
+        "author": "Nguyen An",
+        "created_at_from": "2024-01-01",
+        "created_at_to": "2024-01-31"
+      },
+      "baseline_docs": 5233329,
+      "matched_docs": 1793,
+      "narrowing_pct": 99.9657,
+      "count_elapsed_ms": 94131.8344,
+      "latency_observation": "one-pass offline metadata count in milliseconds; search latency is covered by the US-S4-006 API smoke proof",
+      "sample_results": [
+        {
+          "doc_id": "12",
+          "numeric_id": 0,
+          "title": "Anarchism",
+          "author": "Nguyen An",
+          "created_at": "2024-01-01",
+          "modified_at": "2024-01-02"
+        },
+        {
+          "doc_id": "6780",
+          "numeric_id": 2944,
+          "title": "CD-R",
+          "author": "Nguyen An",
+          "created_at": "2024-01-25",
+          "modified_at": "2024-01-25"
+        },
+        {
+          "doc_id": "11315",
+          "numeric_id": 5120,
+          "title": "Friends",
+          "author": "Nguyen An",
+          "created_at": "2024-01-11",
+          "modified_at": "2024-01-19"
+        }
+      ]
+    }
+  ]
+}

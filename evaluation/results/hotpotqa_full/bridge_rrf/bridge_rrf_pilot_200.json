@@ -1,0 +1,67 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "tv_hybrid",
+      "tv_two_hop_bridge_rrf"
+    ],
+    "top_k": 10,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 50,
+    "candidate_k": 50,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 3,
+    "second_hop_k": 5,
+    "hop1_top_k": 3,
+    "hop2_top_k": 5,
+    "context_chars": 256,
+    "beam_size": 2,
+    "max_bridge_terms": 6,
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.148,
+        "recall@10": 0.74,
+        "mrr@10": 0.8608,
+        "ndcg@10": 0.7214,
+        "latency_p50_ms": 838.6779,
+        "latency_p95_ms": 2080.4528,
+        "latency_p99_ms": 4516.8636,
+        "qps": 0.8313,
+        "queries": 200,
+        "full_support_recall@2": 0.33,
+        "full_support_recall@5": 0.475,
+        "full_support_recall@10": 0.535
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\bridge_rrf\\tv_hybrid_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_two_hop_bridge_rrf",
+      "metrics": {
+        "precision@10": 0.147,
+        "recall@10": 0.735,
+        "mrr@10": 0.8468,
+        "ndcg@10": 0.6916,
+        "latency_p50_ms": 1766.5114,
+        "latency_p95_ms": 2832.742,
+        "latency_p99_ms": 3630.6578,
+        "qps": 0.5281,
+        "queries": 200,
+        "full_support_recall@2": 0.17,
+        "full_support_recall@5": 0.45,
+        "full_support_recall@10": 0.52,
+        "chain_recall@1": 0.17,
+        "chain_recall@5": 0.39,
+        "chain_mrr": 0.2589
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\bridge_rrf\\tv_two_hop_bridge_rrf_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

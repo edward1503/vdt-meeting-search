@@ -21,7 +21,7 @@ METHOD_MAP = {
     "es_iterative_sentence": "iterative_sentence",
     "es_iterative_fast": "iterative_fast",
 }
-TURBOVEC_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
+TURBOVEC_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "tv_two_hop_bridge_rrf"}
 ITERATIVE_MODES = {
     "iterative_hybrid": "context",
     "iterative_title": "title",
@@ -89,6 +89,8 @@ def run_benchmark(
     second_hop_k: int,
     context_chars: int,
     run_dir: Path,
+    beam_size: int = 3,
+    max_bridge_terms: int = 8,
     query_file: Path | None = None,
     qrels_file: Path | None = None,
 ) -> dict[str, Any]:
@@ -133,10 +135,20 @@ def run_benchmark(
                 second_hop_k=second_hop_k,
                 context_chars=context_chars,
                 num_candidates=num_candidates,
+                beam_size=beam_size,
+                max_bridge_terms=max_bridge_terms,
             )
             latencies[query_id] = (time.perf_counter() - start) * 1000
             hits = [
-                SearchHit(doc_id=str(hit["doc_id"]), score=float(hit.get("score", 0.0)), rank=rank, method=method)
+                SearchHit(
+                    doc_id=str(hit["doc_id"]),
+                    score=float(hit.get("score", 0.0)),
+                    rank=rank,
+                    method=method,
+                    hop=int(hit.get("hop", 1) or 1),
+                    chain_rank=int(hit["chain_rank"]) if hit.get("chain_rank") is not None else None,
+                    chain_doc_ids=tuple(str(doc_id) for doc_id in hit.get("chain_doc_ids", []) if str(doc_id)),
+                )
                 for rank, hit in enumerate(raw_hits[:top_k], start=1)
             ]
             runs[query_id] = hits
@@ -162,7 +174,11 @@ def run_benchmark(
             "rrf_k": rrf_k,
             "first_hop_k": first_hop_k,
             "second_hop_k": second_hop_k,
+            "hop1_top_k": first_hop_k,
+            "hop2_top_k": second_hop_k,
             "context_chars": context_chars,
+            "beam_size": beam_size,
+            "max_bridge_terms": max_bridge_terms,
             "query_file": str(query_file) if query_file else None,
             "qrels_file": str(qrels_file) if qrels_file else None,
         },
@@ -182,8 +198,21 @@ def _search_method(
     second_hop_k: int,
     context_chars: int,
     num_candidates: int,
+    beam_size: int,
+    max_bridge_terms: int,
 ) -> list[dict[str, Any]]:
     if classify_method(method) == "turbovec":
+        if method == "tv_two_hop_bridge_rrf":
+            return retriever.search_two_hop_bridge_rrf(
+                query_text,
+                top_k,
+                hop1_top_k=first_hop_k,
+                hop2_top_k=second_hop_k,
+                beam_size=beam_size,
+                max_bridge_terms=max_bridge_terms,
+                candidate_k=candidate_k,
+                rrf_k=rrf_k,
+            )
         return retriever.search(query_text, method, top_k, candidate_k=candidate_k, rrf_k=rrf_k)
     es_method = map_es_method(method)
     if es_method == "iterative_hybrid":
@@ -237,6 +266,8 @@ def main() -> None:
     parser.add_argument("--first-hop-k", type=int, default=settings.multihop_first_hop)
     parser.add_argument("--second-hop-k", type=int, default=settings.multihop_second_hop)
     parser.add_argument("--context-chars", type=int, default=settings.multihop_context_chars)
+    parser.add_argument("--beam-size", type=int, default=3)
+    parser.add_argument("--max-bridge-terms", type=int, default=8)
     args = parser.parse_args()
 
     methods = [method.strip() for method in args.methods.split(",") if method.strip()]
@@ -255,6 +286,8 @@ def main() -> None:
         second_hop_k=args.second_hop_k,
         context_chars=args.context_chars,
         run_dir=args.run_dir,
+        beam_size=args.beam_size,
+        max_bridge_terms=args.max_bridge_terms,
         query_file=args.query_file,
         qrels_file=args.qrels_file,
     )
@@ -289,9 +322,11 @@ def _load_query_file(path: Path, max_queries: int | None) -> tuple[dict[str, str
         for idx, row in enumerate(reader):
             if max_queries is not None and idx >= max_queries:
                 break
-            variant_id = str(row["variant_query_id"])
-            queries[variant_id] = str(row["query"])
-            source_query_ids[variant_id] = str(row["source_query_id"])
+            query_id = str(row.get("variant_query_id") or row.get("query_id") or "").strip()
+            if not query_id:
+                raise ValueError(f"Query file row is missing query id: {path}")
+            queries[query_id] = str(row["query"])
+            source_query_ids[query_id] = str(row.get("source_query_id") or query_id)
     return queries, source_query_ids
 
 
