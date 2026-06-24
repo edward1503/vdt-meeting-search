@@ -1,0 +1,6 @@
+interface:
+  display_name: "Vdt Meeting Search"
+  short_description: "Repo-specific patterns and workflows for vdt-meeting-search"
+  default_prompt: "Use the vdt-meeting-search repo skill to follow existing architecture, testing, and workflow conventions."
+policy:
+  allow_implicit_invocation: true
