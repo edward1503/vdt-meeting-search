@@ -192,7 +192,10 @@ class TurboVecHybridRetriever:
         timing["candidate_fusion"] = (time.perf_counter() - start) * 1000
 
         start = time.perf_counter()
-        reranker = self._rerankers.setdefault(reranker_model, CrossEncoderReranker(reranker_model))
+        reranker = self._rerankers.get(reranker_model)
+        if reranker is None:
+            reranker = CrossEncoderReranker(reranker_model)
+            self._rerankers[reranker_model] = reranker
         reranked = rerank_hits(query, candidates, reranker, top_k=top_k)
         timing["rerank"] = (time.perf_counter() - start) * 1000
         self.last_timing_ms = timing

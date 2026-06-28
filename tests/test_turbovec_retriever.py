@@ -150,6 +150,39 @@ def test_tv_hybrid_fuses_bm25_and_dense_and_preserves_hydrated_order():
     assert [hit["doc_id"] for hit in hits] == ["d2", "d1"]
     assert hits[0]["source"] == "bm25+dense"
 
+def test_tv_hybrid_rerank_reuses_cached_reranker_for_same_model(monkeypatch):
+    constructed = []
+
+    class FakeESRetriever:
+        def search(self, query, method, top_k, candidate_k=100, rrf_k=60):
+            assert method == "bm25"
+            return [{"doc_id": "d1", "title": "BM25", "text": "text", "score": 1.0, "source": "bm25"}]
+
+    class FakeReranker:
+        def __init__(self, model_name):
+            constructed.append(model_name)
+
+        def predict(self, pairs):
+            return [2.0 for _ in pairs]
+
+    retriever = TurboVecHybridRetriever(
+        bm25_retriever=FakeESRetriever(),
+        tv_index=object(),
+        embedder=object(),
+        docstore=object(),
+    )
+    monkeypatch.setattr("src.retrieval.turbovec_retriever.CrossEncoderReranker", FakeReranker)
+    monkeypatch.setattr(
+        retriever,
+        "_search_dense",
+        lambda query, top_k: [{"doc_id": "d2", "title": "Dense", "text": "text", "score": 0.9, "source": "dense"}],
+    )
+
+    retriever.search_hybrid_rerank("query", top_k=1, candidate_k=2, reranker_model="fake-model")
+    retriever.search_hybrid_rerank("query", top_k=1, candidate_k=2, reranker_model="fake-model")
+
+    assert constructed == ["fake-model"]
+
 def test_tv_filtered_hybrid_uses_bm25_numeric_ids_as_turbovec_allowlist():
     calls = []
 
