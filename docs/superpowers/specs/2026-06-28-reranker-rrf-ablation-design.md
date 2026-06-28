@@ -81,7 +81,7 @@ For each query:
 
 The reranker should be lazy-loaded so normal `tv_hybrid` and API startup do not pay the model-loading cost.
 
-Use `cross-encoder/ms-marco-MiniLM-L-6-v2` as the first reranker model through `sentence_transformers.CrossEncoder`, with a CLI option to override it. The selected model name must be recorded in benchmark config. If the environment lacks the dependency or model, the benchmark should fail with a clear message rather than silently falling back to RRF.
+Expose the reranker model through a `--reranker-model` CLI option and record the selected model in benchmark config and the report. Use `cross-encoder/ms-marco-MiniLM-L-6-v2` only as the default smoke-test model because it is small and easy to run locally; treat it as a generic cross-encoder baseline, not as a HotpotQA-optimized reranker. Pilot and decision runs may override this with a stronger reranker model when the local environment can load it. If the environment lacks the dependency or model, the benchmark should fail with a clear message rather than silently falling back to RRF.
 
 ### Report
 
@@ -89,6 +89,7 @@ Create the report at `docs/sprint5/reranker-rrf-ablation-report.md`. The report 
 
 - Commands used for smoke, pilot, and decision pilot.
 - Artifact paths for JSON and TREC outputs.
+- The reranker model used for each run, including whether it is a generic baseline or a stronger override.
 - Metrics table for `tv_hybrid` vs `tv_hybrid_rerank`: `full_support_recall@10`, `recall@10`, `mrr@10`, `ndcg@10`, latency p50/p95, and QPS.
 - Candidate diagnostics summary: candidate recall, missing candidate count, partial support count, candidate-ranked-low count.
 - Recommendation: keep RRF, tune candidate generation, or continue reranker work.
