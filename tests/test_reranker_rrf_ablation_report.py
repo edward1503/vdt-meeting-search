@@ -100,3 +100,9 @@ def test_build_report_includes_model_metrics_diagnostics_and_caveat(tmp_path: Pa
     assert "not a paper-comparable claim" in report
     assert "| tv_hybrid_rerank | 0.6000 |" in report
     assert "net reranker wins: 4" in report
+    assert "## Candidate Diagnostics" in report
+    assert "Candidate recall@depth: 0.9000" in report
+    assert "Missing candidate: 2" in report
+    assert "Partial candidate support: 3" in report
+    assert "Candidate ranked low: 4" in report
+    assert "Success at target cutoff: 5" in report
