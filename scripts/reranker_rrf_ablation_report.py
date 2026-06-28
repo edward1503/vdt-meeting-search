@@ -3,8 +3,13 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from scripts.ranking_diagnostics import load_qrels_tsv, load_trec_run
 
@@ -65,8 +70,8 @@ def build_report(
     queries = _query_count(paired_summary, rrf_result, rerank_result, rrf_row, rerank_row)
     scope = "smoke" if queries < 50 else "pilot"
 
-    diag_summary = diagnostics.get("methods", {}).get("tv_hybrid", {})
-    buckets = diag_summary.get("failure_buckets", {})
+    diag_summary = _diagnostics_by_method(diagnostics, "tv_hybrid")
+    buckets = diag_summary["failure_buckets"]
 
     lines = [
         "# Reranker vs RRF Ablation",
@@ -100,11 +105,11 @@ def build_report(
         "",
         "## Candidate Diagnostics",
         "",
-        f"- Candidate recall@depth: {float(diag_summary.get('candidate_recall_at_depth', 0.0)):.4f}",
-        f"- Missing candidate: {int(buckets.get('missing_candidate', 0))}",
-        f"- Partial candidate support: {int(buckets.get('partial_candidate_support', 0))}",
-        f"- Candidate ranked low: {int(buckets.get('candidate_ranked_low', 0))}",
-        f"- Success at target cutoff: {int(buckets.get('success', 0))}",
+        f"- Candidate recall@depth: {float(diag_summary['candidate_recall_at_depth']):.4f}",
+        f"- Missing candidate: {int(buckets['missing_candidate'])}",
+        f"- Partial candidate support: {int(buckets['partial_candidate_support'])}",
+        f"- Candidate ranked low: {int(buckets['candidate_ranked_low'])}",
+        f"- Success at target cutoff: {int(buckets['success'])}",
         "",
         "## Recommendation Rule",
         "",
@@ -194,6 +199,22 @@ def _artifact_path_lines(rrf_run_path: Path | None, rerank_run_path: Path | None
     if rerank_run_path is not None:
         lines.append(f"- Reranker TREC run: `{rerank_run_path}`")
     return lines
+
+
+def _diagnostics_by_method(diagnostics: dict[str, Any], method: str) -> dict[str, Any]:
+    methods = diagnostics.get("methods", {})
+    if method not in methods:
+        raise ValueError(f"Missing diagnostics for method {method}")
+    summary = methods[method]
+    if "candidate_recall_at_depth" not in summary:
+        raise ValueError("Missing diagnostics field candidate_recall_at_depth")
+    if "failure_buckets" not in summary:
+        raise ValueError("Missing diagnostics field failure_buckets")
+    buckets = summary["failure_buckets"]
+    for key in ("missing_candidate", "partial_candidate_support", "candidate_ranked_low", "success"):
+        if key not in buckets:
+            raise ValueError(f"Missing diagnostics field failure_buckets.{key}")
+    return summary
 
 
 def _metric(method: str, metrics: dict[str, Any], name: str, cutoff: int) -> float:

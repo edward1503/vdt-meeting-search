@@ -155,7 +155,19 @@ def test_build_report_labels_small_runs_as_smoke() -> None:
                 }
             ],
         },
-        diagnostics={"methods": {"tv_hybrid": {"candidate_recall_at_depth": 0.0, "failure_buckets": {}}}},
+        diagnostics={
+            "methods": {
+                "tv_hybrid": {
+                    "candidate_recall_at_depth": 0.0,
+                    "failure_buckets": {
+                        "missing_candidate": 0,
+                        "partial_candidate_support": 0,
+                        "candidate_ranked_low": 0,
+                        "success": 0,
+                    },
+                }
+            }
+        },
         paired_summary={
             "queries": 5,
             "rrf_only_success": 0,
@@ -209,7 +221,19 @@ def test_build_report_falls_back_to_config_or_metric_query_count() -> None:
                 }
             ],
         },
-        diagnostics={"methods": {"tv_hybrid": {"candidate_recall_at_depth": 0.0, "failure_buckets": {}}}},
+        diagnostics={
+            "methods": {
+                "tv_hybrid": {
+                    "candidate_recall_at_depth": 0.0,
+                    "failure_buckets": {
+                        "missing_candidate": 0,
+                        "partial_candidate_support": 0,
+                        "candidate_ranked_low": 0,
+                        "success": 0,
+                    },
+                }
+            }
+        },
         paired_summary={
             "queries": 0,
             "rrf_only_success": 0,
@@ -249,7 +273,19 @@ def test_build_report_raises_for_missing_method_or_metric() -> None:
         build_report(
             rrf_result=base_result,
             rerank_result={"config": {"top_k": 10}, "results": []},
-            diagnostics={"methods": {"tv_hybrid": {"candidate_recall_at_depth": 0.0, "failure_buckets": {}}}},
+            diagnostics={
+                "methods": {
+                    "tv_hybrid": {
+                        "candidate_recall_at_depth": 0.0,
+                        "failure_buckets": {
+                            "missing_candidate": 0,
+                            "partial_candidate_support": 0,
+                            "candidate_ranked_low": 0,
+                            "success": 0,
+                        },
+                    }
+                }
+            },
             paired_summary={"queries": 5},
             rrf_path=Path("rrf.json"),
             rerank_path=Path("rerank.json"),
@@ -264,7 +300,85 @@ def test_build_report_raises_for_missing_method_or_metric() -> None:
         build_report(
             rrf_result=base_result,
             rerank_result=missing_metric_result,
-            diagnostics={"methods": {"tv_hybrid": {"candidate_recall_at_depth": 0.0, "failure_buckets": {}}}},
+            diagnostics={
+                "methods": {
+                    "tv_hybrid": {
+                        "candidate_recall_at_depth": 0.0,
+                        "failure_buckets": {
+                            "missing_candidate": 0,
+                            "partial_candidate_support": 0,
+                            "candidate_ranked_low": 0,
+                            "success": 0,
+                        },
+                    }
+                }
+            },
+            paired_summary={"queries": 5},
+            rrf_path=Path("rrf.json"),
+            rerank_path=Path("rerank.json"),
+            diagnostics_path=Path("diag.json"),
+        )
+
+
+def test_build_report_raises_for_missing_diagnostics() -> None:
+    rrf_result = {
+        "config": {"top_k": 10},
+        "results": [
+            {
+                "method": "tv_hybrid",
+                "metrics": {
+                    "full_support_recall@10": 0.1,
+                    "recall@10": 0.2,
+                    "mrr@10": 0.3,
+                    "ndcg@10": 0.4,
+                    "latency_p50_ms": 50,
+                    "latency_p95_ms": 100,
+                    "qps": 2.0,
+                },
+            }
+        ],
+    }
+    rerank_result = {
+        "config": {"top_k": 10},
+        "results": [
+            {
+                "method": "tv_hybrid_rerank",
+                "metrics": {
+                    "full_support_recall@10": 0.2,
+                    "recall@10": 0.3,
+                    "mrr@10": 0.4,
+                    "ndcg@10": 0.5,
+                    "latency_p50_ms": 60,
+                    "latency_p95_ms": 120,
+                    "qps": 1.0,
+                },
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match="Missing diagnostics for method tv_hybrid"):
+        build_report(
+            rrf_result=rrf_result,
+            rerank_result=rerank_result,
+            diagnostics={"methods": {}},
+            paired_summary={"queries": 5},
+            rrf_path=Path("rrf.json"),
+            rerank_path=Path("rerank.json"),
+            diagnostics_path=Path("diag.json"),
+        )
+
+    with pytest.raises(ValueError, match="Missing diagnostics field failure_buckets.partial_candidate_support"):
+        build_report(
+            rrf_result=rrf_result,
+            rerank_result=rerank_result,
+            diagnostics={
+                "methods": {
+                    "tv_hybrid": {
+                        "candidate_recall_at_depth": 0.0,
+                        "failure_buckets": {"missing_candidate": 0},
+                    }
+                }
+            },
             paired_summary={"queries": 5},
             rrf_path=Path("rrf.json"),
             rerank_path=Path("rerank.json"),
