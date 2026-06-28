@@ -54,4 +54,23 @@ No Harness policy changes expected.
 
 ## Evidence
 
-Add commands, report paths, and metrics after validation exists.
+- 2026-06-28: Implemented benchmark-only `tv_hybrid_rerank`,
+  configurable `--reranker-model`, top-100 candidate diagnostics, and
+  ablation report generation. Unit proof: `python -m pytest
+  tests/test_reranker.py tests/test_benchmark_es.py
+  tests/test_reranker_rrf_ablation_report.py tests/test_turbovec_retriever.py
+  -q` -> 34 passed.
+- 2026-06-28: Runtime preflight passed for API health, Elasticsearch,
+  embedding service, and Docker services. Five-query smoke wrote artifacts
+  under `evaluation/results/hotpotqa_full/reranker_ablation/` and
+  `evaluation/runs/hotpotqa_full/reranker_ablation/`.
+- 2026-06-28: 200-query pilot completed with candidate budget 100 and
+  reranker model `cross-encoder/ms-marco-MiniLM-L-6-v2`. RRF `tv_hybrid`
+  top-10: full_support@10=0.545, recall@10=0.750, MRR@10=0.8691,
+  nDCG@10=0.7291, p50=631.8788ms, p95=2061.4370ms. Reranker:
+  full_support@10=0.545, recall@10=0.755, MRR@10=0.9268, nDCG@10=0.7464,
+  p50=963.9905ms, p95=1304.2816ms. Paired full-support movement:
+  RRF-only=14, reranker-only=14, net=0. Candidate diagnostics at depth 100:
+  candidate_recall=0.8325, missing_candidate=3, partial_candidate_support=61,
+  candidate_ranked_low=27, success=109. Report:
+  `docs/sprint5/reranker-rrf-ablation-report.md`.

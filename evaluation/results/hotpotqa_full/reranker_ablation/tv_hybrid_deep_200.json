@@ -1,0 +1,46 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "tv_hybrid"
+    ],
+    "top_k": 100,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@100": 0.0167,
+        "recall@100": 0.8325,
+        "mrr@100": 0.8702,
+        "ndcg@100": 0.7496,
+        "latency_p50_ms": 716.4007,
+        "latency_p95_ms": 1486.9778,
+        "latency_p99_ms": 3864.9565,
+        "qps": 1.0052,
+        "queries": 200,
+        "full_support_recall@2": 0.33,
+        "full_support_recall@5": 0.48,
+        "full_support_recall@100": 0.68
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\reranker_ablation\\tv_hybrid_beir_hotpotqa_dev_top100.trec"
+    }
+  ]
+}
