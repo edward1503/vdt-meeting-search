@@ -52,6 +52,8 @@ def build_report(
     rrf_path: Path,
     rerank_path: Path,
     diagnostics_path: Path,
+    rrf_run_path: Path | None = None,
+    rerank_run_path: Path | None = None,
 ) -> str:
     rrf_row = _result_by_method(rrf_result, "tv_hybrid")
     rerank_row = _result_by_method(rerank_result, "tv_hybrid_rerank")
@@ -75,14 +77,15 @@ def build_report(
         f"- RRF benchmark: `{rrf_path}`",
         f"- Reranker benchmark: `{rerank_path}`",
         f"- Candidate diagnostics: `{diagnostics_path}`",
+        *_artifact_path_lines(rrf_run_path, rerank_run_path),
         f"- Reranker model: `{reranker_model}`",
         f"- Target cutoff: top-{target_k}",
         f"- Candidate budget: {candidate_k}",
         "",
         "## Metric Summary",
         "",
-        f"| Method | Full support@{target_k} | Recall@{target_k} | MRR@{target_k} | nDCG@{target_k} | p95 latency ms | QPS |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        f"| Method | Full support@{target_k} | Recall@{target_k} | MRR@{target_k} | nDCG@{target_k} | p50 latency ms | p95 latency ms | QPS |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
         _metric_row("tv_hybrid", rrf_row.get("metrics", {}), target_k),
         _metric_row("tv_hybrid_rerank", rerank_row.get("metrics", {}), target_k),
         "",
@@ -140,6 +143,8 @@ def main() -> None:
         rrf_path=args.rrf_result,
         rerank_path=args.rerank_result,
         diagnostics_path=args.diagnostics,
+        rrf_run_path=args.rrf_run,
+        rerank_run_path=args.rerank_run,
     )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -166,15 +171,25 @@ def _result_by_method(result: dict[str, Any], method: str) -> dict[str, Any]:
 
 
 def _metric_row(method: str, metrics: dict[str, Any], target_k: int) -> str:
-    return "| {method} | {full:.4f} | {recall:.4f} | {mrr:.4f} | {ndcg:.4f} | {p95:.4f} | {qps:.4f} |".format(
+    return "| {method} | {full:.4f} | {recall:.4f} | {mrr:.4f} | {ndcg:.4f} | {p50:.4f} | {p95:.4f} | {qps:.4f} |".format(
         method=method,
         full=_metric(metrics, "full_support_recall", target_k),
         recall=_metric(metrics, "recall", target_k),
         mrr=_metric(metrics, "mrr", target_k),
         ndcg=_metric(metrics, "ndcg", target_k),
+        p50=float(metrics.get("latency_p50_ms", 0.0)),
         p95=float(metrics.get("latency_p95_ms", 0.0)),
         qps=float(metrics.get("qps", 0.0)),
     )
+
+
+def _artifact_path_lines(rrf_run_path: Path | None, rerank_run_path: Path | None) -> list[str]:
+    lines: list[str] = []
+    if rrf_run_path is not None:
+        lines.append(f"- RRF TREC run: `{rrf_run_path}`")
+    if rerank_run_path is not None:
+        lines.append(f"- Reranker TREC run: `{rerank_run_path}`")
+    return lines
 
 
 def _metric(metrics: dict[str, Any], name: str, target_k: int) -> float:

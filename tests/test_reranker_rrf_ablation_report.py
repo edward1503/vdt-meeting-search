@@ -41,6 +41,7 @@ def test_build_report_includes_model_metrics_diagnostics_and_caveat(tmp_path: Pa
                     "recall@10": 0.75,
                     "mrr@10": 0.6,
                     "ndcg@10": 0.65,
+                    "latency_p50_ms": 500,
                     "latency_p95_ms": 1000,
                     "qps": 1.0,
                 },
@@ -57,6 +58,7 @@ def test_build_report_includes_model_metrics_diagnostics_and_caveat(tmp_path: Pa
                     "recall@10": 0.78,
                     "mrr@10": 0.62,
                     "ndcg@10": 0.67,
+                    "latency_p50_ms": 1500,
                     "latency_p95_ms": 2000,
                     "qps": 0.5,
                 },
@@ -92,6 +94,8 @@ def test_build_report_includes_model_metrics_diagnostics_and_caveat(tmp_path: Pa
         rrf_path=Path("rrf.json"),
         rerank_path=Path("rerank.json"),
         diagnostics_path=Path("diag.json"),
+        rrf_run_path=Path("rrf.trec"),
+        rerank_run_path=Path("rerank.trec"),
     )
 
     assert "# Reranker vs RRF Ablation" in report
@@ -99,6 +103,10 @@ def test_build_report_includes_model_metrics_diagnostics_and_caveat(tmp_path: Pa
     assert "200-query pilot" in report
     assert "not a paper-comparable claim" in report
     assert "| tv_hybrid_rerank | 0.6000 |" in report
+    assert "p50 latency ms" in report
+    assert "| tv_hybrid_rerank | 0.6000 | 0.7800 | 0.6200 | 0.6700 | 1500.0000 | 2000.0000 | 0.5000 |" in report
+    assert "RRF TREC run: `rrf.trec`" in report
+    assert "Reranker TREC run: `rerank.trec`" in report
     assert "net reranker wins: 4" in report
     assert "## Candidate Diagnostics" in report
     assert "Candidate recall@depth: 0.9000" in report
