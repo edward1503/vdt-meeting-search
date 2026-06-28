@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -60,9 +61,9 @@ def build_report(
     rerank_config = rerank_result.get("config", {})
     rrf_config = rrf_result.get("config", {})
     reranker_model = str(rerank_config.get("reranker_model", "unknown"))
-    target_k = int(rerank_config.get("top_k") or rrf_config.get("top_k") or 10)
     candidate_k = int(rerank_config.get("candidate_k") or rrf_config.get("candidate_k") or 0)
-    queries = int(paired_summary.get("queries") or rerank_config.get("max_queries") or rrf_config.get("max_queries") or 0)
+    queries = _query_count(paired_summary, rrf_result, rerank_result, rrf_row, rerank_row)
+    scope = "smoke" if queries < 50 else "pilot"
 
     diag_summary = diagnostics.get("methods", {}).get("tv_hybrid", {})
     buckets = diag_summary.get("failure_buckets", {})
@@ -70,7 +71,7 @@ def build_report(
     lines = [
         "# Reranker vs RRF Ablation",
         "",
-        f"Scope: {queries}-query pilot ablation. This is not a paper-comparable claim; small metric deltas need a larger split before final conclusions.",
+        f"Scope: {queries}-query {scope} ablation. This is not a paper-comparable claim; small metric deltas need a larger split before final conclusions.",
         "",
         "## Artifacts",
         "",
@@ -79,24 +80,23 @@ def build_report(
         f"- Candidate diagnostics: `{diagnostics_path}`",
         *_artifact_path_lines(rrf_run_path, rerank_run_path),
         f"- Reranker model: `{reranker_model}`",
-        f"- Target cutoff: top-{target_k}",
         f"- Candidate budget: {candidate_k}",
         "",
         "## Metric Summary",
         "",
-        f"| Method | Full support@{target_k} | Recall@{target_k} | MRR@{target_k} | nDCG@{target_k} | p50 latency ms | p95 latency ms | QPS |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-        _metric_row("tv_hybrid", rrf_row.get("metrics", {}), target_k),
-        _metric_row("tv_hybrid_rerank", rerank_row.get("metrics", {}), target_k),
+        "| Method | Metric cutoff | Full support | Recall | MRR | nDCG | p50 latency ms | p95 latency ms | QPS |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        _metric_row(rrf_row, rrf_config),
+        _metric_row(rerank_row, rerank_config),
         "",
         "## Paired Full-Support Movement",
         "",
         f"- Evaluated paired queries: {paired_summary['queries']}",
-        f"- RRF-only successes: {paired_summary['rrf_only_success']}",
-        f"- Reranker-only successes: {paired_summary['reranker_only_success']}",
-        f"- Both success: {paired_summary['both_success']}",
-        f"- Both fail: {paired_summary['both_fail']}",
-        f"- net reranker wins: {paired_summary['net_reranker_wins']}",
+        f"- RRF-only successes: {paired_summary.get('rrf_only_success', 0)}",
+        f"- Reranker-only successes: {paired_summary.get('reranker_only_success', 0)}",
+        f"- Both success: {paired_summary.get('both_success', 0)}",
+        f"- Both fail: {paired_summary.get('both_fail', 0)}",
+        f"- net reranker wins: {paired_summary.get('net_reranker_wins', 0)}",
         "",
         "## Candidate Diagnostics",
         "",
@@ -167,19 +167,23 @@ def _result_by_method(result: dict[str, Any], method: str) -> dict[str, Any]:
     for row in result.get("results", []):
         if row.get("method") == method:
             return row
-    return {}
+    raise ValueError(f"Missing result row for method {method}")
 
 
-def _metric_row(method: str, metrics: dict[str, Any], target_k: int) -> str:
-    return "| {method} | {full:.4f} | {recall:.4f} | {mrr:.4f} | {ndcg:.4f} | {p50:.4f} | {p95:.4f} | {qps:.4f} |".format(
+def _metric_row(row: dict[str, Any], config: dict[str, Any]) -> str:
+    method = str(row.get("method", "unknown"))
+    metrics = row.get("metrics", {})
+    cutoff = _metric_cutoff(method, metrics, config)
+    return "| {method} | {cutoff} | {full:.4f} | {recall:.4f} | {mrr:.4f} | {ndcg:.4f} | {p50:.4f} | {p95:.4f} | {qps:.4f} |".format(
         method=method,
-        full=_metric(metrics, "full_support_recall", target_k),
-        recall=_metric(metrics, "recall", target_k),
-        mrr=_metric(metrics, "mrr", target_k),
-        ndcg=_metric(metrics, "ndcg", target_k),
-        p50=float(metrics.get("latency_p50_ms", 0.0)),
-        p95=float(metrics.get("latency_p95_ms", 0.0)),
-        qps=float(metrics.get("qps", 0.0)),
+        full=_metric(method, metrics, "full_support_recall", cutoff),
+        recall=_metric(method, metrics, "recall", cutoff),
+        mrr=_metric(method, metrics, "mrr", cutoff),
+        ndcg=_metric(method, metrics, "ndcg", cutoff),
+        p50=_required_metric(method, metrics, "latency_p50_ms"),
+        p95=_required_metric(method, metrics, "latency_p95_ms"),
+        qps=_required_metric(method, metrics, "qps"),
+        cutoff=cutoff,
     )
 
 
@@ -192,8 +196,45 @@ def _artifact_path_lines(rrf_run_path: Path | None, rerank_run_path: Path | None
     return lines
 
 
-def _metric(metrics: dict[str, Any], name: str, target_k: int) -> float:
-    return float(metrics.get(f"{name}@{target_k}", metrics.get(f"{name}@10", 0.0)))
+def _metric(method: str, metrics: dict[str, Any], name: str, cutoff: int) -> float:
+    return _required_metric(method, metrics, f"{name}@{cutoff}")
+
+
+def _required_metric(method: str, metrics: dict[str, Any], key: str) -> float:
+    if key not in metrics:
+        raise ValueError(f"Missing metric {key} for method {method}")
+    return float(metrics[key])
+
+
+def _metric_cutoff(method: str, metrics: dict[str, Any], config: dict[str, Any]) -> int:
+    if config.get("top_k"):
+        return int(config["top_k"])
+    for name in ("full_support_recall", "recall", "mrr", "ndcg"):
+        for key in metrics:
+            match = re.fullmatch(rf"{re.escape(name)}@(\d+)", str(key))
+            if match:
+                return int(match.group(1))
+    raise ValueError(f"Missing metric cutoff for method {method}")
+
+
+def _query_count(
+    paired_summary: dict[str, int],
+    rrf_result: dict[str, Any],
+    rerank_result: dict[str, Any],
+    rrf_row: dict[str, Any],
+    rerank_row: dict[str, Any],
+) -> int:
+    for value in (
+        paired_summary.get("queries"),
+        rerank_result.get("config", {}).get("max_queries"),
+        rerank_result.get("config", {}).get("queries"),
+        rerank_row.get("metrics", {}).get("queries"),
+        rrf_result.get("config", {}).get("queries"),
+        rrf_row.get("metrics", {}).get("queries"),
+    ):
+        if value:
+            return int(value)
+    return 0
 
 
 def _top_hits(hits: list[dict[str, Any]], target_k: int) -> list[dict[str, Any]]:
