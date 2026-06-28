@@ -9,6 +9,7 @@ from urllib import request
 import numpy as np
 
 from src.retrieval.elasticsearch_retriever import fuse_rrf
+from src.retrieval.reranker import CrossEncoderReranker, dedupe_hits, rerank_hits
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
 
@@ -96,6 +97,7 @@ class TurboVecHybridRetriever:
         self.embedder = embedder
         self.docstore = docstore
         self.last_timing_ms: dict[str, float] = {}
+        self._rerankers: dict[str, CrossEncoderReranker] = {}
 
     @classmethod
     def from_paths(
@@ -169,6 +171,32 @@ class TurboVecHybridRetriever:
         if method == "tv_filtered_hybrid":
             return self._search_filtered_hybrid(query, top_k, bm25_k=bm25_k, dense_k=dense_k, rrf_k=rrf_k)
         raise ValueError(f"Unknown TurboVec method: {method}")
+
+    def search_hybrid_rerank(
+        self,
+        query: str,
+        top_k: int,
+        candidate_k: int = 100,
+        rrf_k: int = 60,
+        reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    ) -> list[dict[str, Any]]:
+        start = time.perf_counter()
+        bm25_hits = self.bm25_retriever.search(query, "bm25", candidate_k)
+        bm25_ms = (time.perf_counter() - start) * 1000
+
+        dense_hits = self._search_dense(query, candidate_k)
+        timing = {**self.last_timing_ms, "bm25": bm25_ms}
+
+        start = time.perf_counter()
+        candidates = dedupe_hits(fuse_rrf([bm25_hits, dense_hits], top_k=candidate_k, rrf_k=rrf_k))
+        timing["candidate_fusion"] = (time.perf_counter() - start) * 1000
+
+        start = time.perf_counter()
+        reranker = self._rerankers.setdefault(reranker_model, CrossEncoderReranker(reranker_model))
+        reranked = rerank_hits(query, candidates, reranker, top_k=top_k)
+        timing["rerank"] = (time.perf_counter() - start) * 1000
+        self.last_timing_ms = timing
+        return reranked
 
     def search_two_hop_bridge_rrf(
         self,

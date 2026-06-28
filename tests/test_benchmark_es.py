@@ -381,3 +381,62 @@ def test_run_benchmark_dispatches_tv_two_hop_bridge_rrf(monkeypatch, tmp_path):
     assert result["config"]["beam_size"] == 2
     assert result["config"]["max_bridge_terms"] == 6
     assert result["results"][0]["metrics"]["chain_recall@1"] == 1.0
+
+def test_method_mapping_accepts_tv_hybrid_rerank():
+    assert benchmark_es.classify_method("tv_hybrid_rerank") == "turbovec"
+
+def test_run_benchmark_dispatches_tv_hybrid_rerank_and_records_model(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeDataset:
+        def queries_iter(self):
+            yield SimpleNamespace(query_id="q1", text="query")
+
+        def qrels_iter(self):
+            yield SimpleNamespace(query_id="q1", doc_id="d1", relevance=1)
+
+    class FakeRetriever:
+        def search_hybrid_rerank(self, query, top_k, candidate_k, rrf_k, reranker_model):
+            calls.append(
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "candidate_k": candidate_k,
+                    "rrf_k": rrf_k,
+                    "reranker_model": reranker_model,
+                }
+            )
+            return [{"doc_id": "d1", "score": 2.0, "source": "bm25+dense+rerank"}]
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: FakeDataset())
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["tv_hybrid_rerank"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=25,
+        rrf_k=30,
+        first_hop_k=5,
+        second_hop_k=10,
+        context_chars=256,
+        run_dir=tmp_path,
+        reranker_model="fake-reranker",
+    )
+
+    assert calls == [
+        {
+            "query": "query",
+            "top_k": 10,
+            "candidate_k": 25,
+            "rrf_k": 30,
+            "reranker_model": "fake-reranker",
+        }
+    ]
+    assert result["config"]["reranker_model"] == "fake-reranker"
+    assert result["results"][0]["metrics"]["full_support_recall@10"] == 1.0
