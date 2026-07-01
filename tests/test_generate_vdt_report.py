@@ -47,3 +47,22 @@ def test_emit_body_renders_markdown_table_as_word_table() -> None:
         "0.7500",
         "2061-3089 ms",
     ]
+
+
+def test_submission_markdown_contains_expanded_vdt_sections() -> None:
+    source = (ROOT / "submission" / "bao-cao-vdt-2026.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "TurboVec không thay Elasticsearch",
+        "tv_hybrid",
+        "tv_bridge_title_entities_rrf",
+        "Ablation 200 truy vấn",
+        "full test 7,405 truy vấn",
+        "Pyserini",
+        "MDR",
+        "Beam Retrieval",
+        "IRCoT",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in source
