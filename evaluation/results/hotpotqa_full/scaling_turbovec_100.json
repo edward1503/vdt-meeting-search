@@ -1,0 +1,64 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "tv_dense",
+      "tv_hybrid"
+    ],
+    "top_k": 10,
+    "max_queries": 100,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 50,
+    "candidate_k": 50,
+    "queries": 100,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_dense",
+      "metrics": {
+        "precision@10": 0.138,
+        "recall@10": 0.69,
+        "mrr@10": 0.8294,
+        "ndcg@10": 0.6729,
+        "latency_p50_ms": 624.2155,
+        "latency_p95_ms": 1394.7446,
+        "latency_p99_ms": 3652.4702,
+        "qps": 0.7495,
+        "queries": 100,
+        "full_support_recall@2": 0.25,
+        "full_support_recall@5": 0.39,
+        "full_support_recall@10": 0.46
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\scaling_turbovec_100\\tv_dense_beir_hotpotqa_dev_top10.trec"
+    },
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.137,
+        "recall@10": 0.685,
+        "mrr@10": 0.8223,
+        "ndcg@10": 0.67,
+        "latency_p50_ms": 715.952,
+        "latency_p95_ms": 2794.4576,
+        "latency_p99_ms": 3834.8228,
+        "qps": 0.9905,
+        "queries": 100,
+        "full_support_recall@2": 0.26,
+        "full_support_recall@5": 0.41,
+        "full_support_recall@10": 0.45
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\scaling_turbovec_100\\tv_hybrid_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "es_bm25"
+    ],
+    "top_k": 10,
+    "max_queries": 1000,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 50,
+    "candidate_k": 50,
+    "queries": 1000,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "es_bm25",
+      "metrics": {
+        "precision@10": 0.1191,
+        "recall@10": 0.5955,
+        "mrr@10": 0.7125,
+        "ndcg@10": 0.5693,
+        "latency_p50_ms": 80.1507,
+        "latency_p95_ms": 232.1278,
+        "latency_p99_ms": 343.4371,
+        "qps": 10.0302,
+        "queries": 1000,
+        "full_support_recall@2": 0.176,
+        "full_support_recall@5": 0.305,
+        "full_support_recall@10": 0.356
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\scaling_es_bm25_1000\\es_bm25_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

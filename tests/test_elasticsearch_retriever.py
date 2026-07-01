@@ -1,6 +1,16 @@
 ﻿from __future__ import annotations
 
-from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever, build_bm25_index_body, bm25_bulk_action, build_bm25_query, build_index_body, build_knn_query, bulk_action, fuse_rrf
+from src.retrieval.elasticsearch_retriever import (
+    ElasticsearchRetriever,
+    build_bm25_index_body,
+    bm25_bulk_action,
+    build_bm25_query,
+    build_index_body,
+    build_knn_query,
+    build_title_aware_bm25_query,
+    bulk_action,
+    fuse_rrf,
+)
 
 
 
@@ -23,6 +33,15 @@ def test_bm25_index_body_can_include_metadata_fields():
     assert props["modified_at"] == {"type": "date"}
     assert props["source_split"] == {"type": "keyword"}
     assert props["answer"] == {"type": "keyword"}
+    assert body["settings"]["number_of_shards"] == 2
+
+def test_title_aware_bm25_index_body_adds_title_fields():
+    body = build_bm25_index_body(shards=2, title_aware=True)
+
+    props = body["mappings"]["properties"]
+    assert props["title_exact"] == {"type": "keyword"}
+    assert props["lead_sentence"] == {"type": "text"}
+    assert props["title_repeat_content"] == {"type": "text"}
     assert body["settings"]["number_of_shards"] == 2
 
 def test_build_index_body_supports_optional_vimqa_metadata_fields():
@@ -75,6 +94,37 @@ def test_bm25_bulk_action_copies_metadata_fields_when_present():
     assert action["modified_at"] == "2024-01-02"
     assert action["source_split"] == "train,test"
     assert action["answer"] == "Hà Nội"
+
+def test_title_aware_bm25_bulk_action_adds_enriched_fields():
+    action = bm25_bulk_action(
+        "idx",
+        {
+            "numeric_id": 7,
+            "doc_id": "d7",
+            "title": "Ada Lovelace",
+            "text": "First sentence. Second sentence.",
+            "url": "",
+            "content": "Ada Lovelace\nFirst sentence. Second sentence.",
+        },
+        title_aware=True,
+    )
+
+    assert action["title_exact"] == "Ada Lovelace"
+    assert action["lead_sentence"] == "First sentence"
+    assert action["title_repeat_content"] == "Ada Lovelace\nAda Lovelace\nFirst sentence. Second sentence."
+
+def test_build_title_aware_bm25_query_boosts_title_fields():
+    body = build_title_aware_bm25_query("analytical engine", 10)
+
+    assert body["query"]["multi_match"]["query"] == "analytical engine"
+    assert body["query"]["multi_match"]["fields"] == [
+        "title^3",
+        "title_exact^4",
+        "title_repeat_content^1.5",
+        "lead_sentence^1.2",
+        "content",
+    ]
+    assert {"title_exact", "lead_sentence", "title_repeat_content"}.issubset(set(body["_source"]))
 
 def test_bulk_action_preserves_optional_vimqa_metadata_fields():
     action = bulk_action(

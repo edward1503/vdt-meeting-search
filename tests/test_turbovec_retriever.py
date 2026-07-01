@@ -417,3 +417,68 @@ def test_bridge_query_terms_skip_query_terms_and_dedupe():
     query = retriever._build_bridge_query("original question", hit, max_bridge_terms=3)
 
     assert query == "original question Bridge Bridge Title alpha beta gamma"
+
+def test_title_entity_bridge_query_prioritizes_title_entities_and_lead_terms():
+    retriever = TurboVecHybridRetriever(bm25_retriever=None, tv_index=None, embedder=None, docstore=None)
+    hit = {
+        "title": "Laura Dern",
+        "text": (
+            "Laura Elizabeth Dern appeared in Jurassic Park with Sam Neill. "
+            "Her parents are actors Bruce Dern and Diane Ladd."
+        ),
+    }
+
+    query = retriever._build_title_entity_bridge_query(
+        "Which actor appeared with Sam Neill?",
+        hit,
+        max_bridge_terms=8,
+    )
+
+    assert query == "Which actor appeared with Sam Neill? Laura Dern Elizabeth Jurassic Park Bruce Diane Ladd"
+
+def test_tv_bridge_title_entities_rrf_uses_focused_bridge_query_and_chain_metadata(monkeypatch):
+    retriever = TurboVecHybridRetriever(
+        bm25_retriever=object(),
+        tv_index=object(),
+        embedder=object(),
+        docstore=object(),
+    )
+    calls = []
+
+    def fake_search(query, method, top_k, bm25_k=100, dense_k=100, rrf_k=60, candidate_k=None, **kwargs):
+        calls.append({"query": query, "method": method, "top_k": top_k, "candidate_k": candidate_k, "rrf_k": rrf_k})
+        if len(calls) == 1:
+            return [
+                {
+                    "doc_id": "bridge",
+                    "numeric_id": 1,
+                    "title": "Laura Dern",
+                    "text": "Laura Elizabeth Dern appeared in Jurassic Park with Sam Neill.",
+                    "score": 0.9,
+                    "source": "bm25+dense",
+                },
+                {"doc_id": "other", "numeric_id": 2, "title": "Other", "text": "noise", "score": 0.8, "source": "bm25+dense"},
+            ]
+        return [
+            {"doc_id": "answer", "numeric_id": 3, "title": "Answer", "text": "answer text", "score": 0.7, "source": "bm25+dense"},
+            {"doc_id": "bridge", "numeric_id": 1, "title": "Laura Dern", "text": "duplicate", "score": 0.6, "source": "bm25+dense"},
+        ]
+
+    monkeypatch.setattr(retriever, "search", fake_search)
+
+    hits = retriever.search_bridge_title_entities_rrf(
+        "Which actor appeared with Sam Neill?",
+        top_k=3,
+        hop1_top_k=2,
+        hop2_top_k=2,
+        beam_size=1,
+        max_bridge_terms=4,
+        candidate_k=20,
+        rrf_k=30,
+    )
+
+    assert calls[1]["query"] == "Which actor appeared with Sam Neill? Laura Dern Elizabeth Jurassic"
+    assert [hit["doc_id"] for hit in hits[:2]] == ["bridge", "answer"]
+    assert hits[0]["source"] == "bridge_title_entities_rrf"
+    assert hits[0]["chain_doc_ids"] == ["bridge", "answer"]
+    assert hits[1]["hop"] == 2

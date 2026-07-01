@@ -108,6 +108,7 @@ def test_write_metadata_shards_writes_enriched_rows_and_manifest(tmp_path):
     assert manifest["files_written"] == 1
     assert manifest["metadata_fields"] == ["author", "created_at", "modified_at"]
     assert manifest["author_count"] == 128
+    assert manifest["author_policy"].endswith("not real dataset metadata")
     assert manifest["modified_docs"] == 1
     assert manifest["unchanged_docs"] == 1
     assert manifest["embedding_text_policy"] == "unchanged content-only text; synthetic metadata is not embedded"

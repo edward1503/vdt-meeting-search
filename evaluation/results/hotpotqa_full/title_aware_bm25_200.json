@@ -1,0 +1,46 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_titleaware_bm25_current",
+    "methods": [
+      "es_bm25_title"
+    ],
+    "top_k": 10,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 3,
+    "max_bridge_terms": 8,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "es_bm25_title",
+      "metrics": {
+        "precision@10": 0.121,
+        "recall@10": 0.605,
+        "mrr@10": 0.7159,
+        "ndcg@10": 0.5786,
+        "latency_p50_ms": 111.5174,
+        "latency_p95_ms": 316.9459,
+        "latency_p99_ms": 666.2526,
+        "qps": 6.6254,
+        "queries": 200,
+        "full_support_recall@2": 0.205,
+        "full_support_recall@5": 0.32,
+        "full_support_recall@10": 0.365
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\title_aware_bm25\\es_bm25_title_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

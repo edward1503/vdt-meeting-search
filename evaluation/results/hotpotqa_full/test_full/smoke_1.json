@@ -1,0 +1,68 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/test",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "tv_hybrid",
+      "tv_bridge_title_entities_rrf"
+    ],
+    "top_k": 10,
+    "max_queries": 1,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 1,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 1,
+    "max_bridge_terms": 6,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_hybrid",
+      "metrics": {
+        "precision@10": 0.2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "ndcg@10": 1.0,
+        "latency_p50_ms": 24565.2223,
+        "latency_p95_ms": 24565.2223,
+        "latency_p99_ms": 24565.2223,
+        "qps": 0.0407,
+        "queries": 1,
+        "full_support_recall@2": 1.0,
+        "full_support_recall@5": 1.0,
+        "full_support_recall@10": 1.0
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\test_full_smoke\\tv_hybrid_beir_hotpotqa_test_top10.trec"
+    },
+    {
+      "method": "tv_bridge_title_entities_rrf",
+      "metrics": {
+        "precision@10": 0.2,
+        "recall@10": 1.0,
+        "mrr@10": 1.0,
+        "ndcg@10": 0.8772,
+        "latency_p50_ms": 3672.9464,
+        "latency_p95_ms": 3672.9464,
+        "latency_p99_ms": 3672.9464,
+        "qps": 0.2723,
+        "queries": 1,
+        "full_support_recall@2": 0.0,
+        "full_support_recall@5": 1.0,
+        "full_support_recall@10": 1.0,
+        "chain_recall@1": 0.0,
+        "chain_recall@5": 1.0,
+        "chain_mrr": 0.3333
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\test_full_smoke\\tv_bridge_title_entities_rrf_beir_hotpotqa_test_top10.trec"
+    }
+  ]
+}

@@ -103,7 +103,7 @@ def create_app(model_name: str | None = None, device: str = "auto", warmup: bool
         }
 
     @app.post("/embed", response_model=EmbedResponse)
-    def embed(request: EmbedRequest) -> EmbedResponse:
+    async def embed(request: EmbedRequest) -> EmbedResponse:
         return EmbedResponse(embedding=encode_text(request.model_id, request.text))
 
     return app

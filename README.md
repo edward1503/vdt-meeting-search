@@ -70,6 +70,30 @@ Open:
 
 The frontend container uses Vite hot reload with `./frontend:/app` and a Docker named volume for `/app/node_modules`. The API container uses Uvicorn reload with bind-mounted Python source. Redis caches repeated `/search` responses using `REDIS_URL` and `SEARCH_CACHE_TTL_SECONDS`. TurboVec search loads the mounted full `.tvim` artifact from `./artifacts`, and query embeddings call the local embedding service at `http://host.docker.internal:8010/embed`, so PyTorch and SentenceTransformers stay outside the Docker API image.
 
+### Demo Cache Warmup
+
+For a low-latency demo, start the full demo runtime with a longer search cache TTL, then warm the first 50 queries for each dataset through the public API:
+
+```powershell
+$env:SEARCH_CACHE_TTL_SECONDS = "86400"
+.\start.sh
+python scripts/warm_demo_cache.py --api-url http://localhost:8001 --datasets hotpotqa,vimqa --limit 50 --top-k 10 --metadata-demo --verify-cache-hit
+```
+
+The warmup command does not write Redis keys directly. It calls `/datasets/{dataset_id}/search`, so it uses the same cache key and default retrieval method as the dashboard. HotpotQA warms with the profile default `tv_hybrid`; VimQA warms with the profile default `es_bm25`. `--metadata-demo` also warms curated semantic metadata queries with `semantic_metadata=true` and no `query_id`, matching the way a presenter types those queries in the Search tab.
+
+If a demo needs a cheaper HotpotQA path, override the method explicitly:
+
+```powershell
+python scripts/warm_demo_cache.py --api-url http://localhost:8001 --datasets hotpotqa --method hotpotqa=es_bm25 --limit 50 --top-k 10 --metadata-demo --verify-cache-hit
+```
+
+To add one-off metadata-mode queries without editing the script, pass `--metadata-query` as `dataset::query`:
+
+```powershell
+python scripts/warm_demo_cache.py --api-url http://localhost:8001 --datasets hotpotqa --limit 0 --metadata-query "hotpotqa::find documents about ozone modified after 2024-02-03" --verify-cache-hit
+```
+
 ## Dataset-First Runtime
 
 The dashboard exposes HotpotQA and VimQA as dataset workspaces from one API/frontend runtime.

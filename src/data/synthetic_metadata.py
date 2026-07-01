@@ -108,7 +108,7 @@ def write_metadata_shards(staging_dir: Path, output_dir: Path, max_files: int | 
         "files_written": files_written,
         "metadata_fields": METADATA_FIELDS,
         "author_count": len(DISPLAY_AUTHORS),
-        "author_policy": "128 realistic synthetic display names generated from Vietnamese-style last/first name combinations; not real HotpotQA metadata",
+        "author_policy": "128 realistic synthetic display names generated from Vietnamese-style last/first name combinations; not real dataset metadata",
         "created_at_policy": "deterministic date spread over 730 days from 2024-01-01",
         "modified_at_policy": "35 percent of documents have modified_at later than created_at by 1 to 44 days",
         "embedding_text_policy": "unchanged content-only text; synthetic metadata is not embedded",

@@ -16,6 +16,8 @@ def test_search_view_exposes_supported_metadata_filters_only_for_dataset_profile
     assert "metadataFilters" in source
     assert "supports_metadata_filters" in source
     assert "Metadata unsupported" in source
+    assert "Metadata enabled" in source
+    assert "HotpotQA enabled" not in source
     assert "compactMetadataFilters" in source
 
     for field in [
@@ -27,7 +29,31 @@ def test_search_view_exposes_supported_metadata_filters_only_for_dataset_profile
     ]:
         assert field in source
 
-    assert "searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, activeFilters)" in source
+    assert "searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, activeFilters" in source
+
+
+def test_search_view_has_opt_in_semantic_metadata_mode_and_chips() -> None:
+    source = _search_view_source()
+
+    assert "semanticMetadata" in source
+    assert "Semantic Metadata" in source
+    assert "parsed_query" in source
+    assert "parsed_chips" in source
+    assert "response?.effective_query" in source
+    assert "semanticMetadata" in Path("frontend/src/lib/api.ts").read_text(encoding="utf-8")
+
+def test_result_card_renders_retrieved_document_metadata_near_uid() -> None:
+    source = _search_view_source()
+
+    assert "ResultMetadata" in source
+    assert "result.author" in source
+    assert "result.created_at" in source
+    assert "result.modified_at" in source
+    assert "result.source_split" in source
+    assert "result.answer" in source
+
+    for label in ["Author", "Created", "Modified", "Split", "Answer"]:
+        assert label in source
 
 
 def test_search_view_has_visible_loading_feedback_and_disables_controls() -> None:

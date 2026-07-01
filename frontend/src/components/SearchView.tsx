@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { searchDataset, type SearchFilters, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
+import { searchDataset, type ParsedMetadataQuery, type SearchFilters, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
+import { buildHighlightTerms, splitHighlightedText, type HighlightSegment } from '@/src/lib/highlight';
 import type { DatasetProfile, SearchPreset } from '@/src/types';
 
 type SearchSuggestion = {
@@ -66,6 +67,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
   const [availableMethods, setAvailableMethods] = useState<string[]>(FALLBACK_METHODS);
   const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
+  const [semanticMetadata, setSemanticMetadata] = useState(false);
   const [metadataFilters, setMetadataFilters] = useState<SearchFilters>({});
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -74,6 +76,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
   const metadataSupported = Boolean(dataset?.supports_metadata_filters);
   const activeMetadataFilters = metadataSupported ? compactMetadataFilters(metadataFilters) : {};
   const hasMetadataFilters = Object.keys(activeMetadataFilters).length > 0;
+  const highlightTerms = buildHighlightTerms(response?.effective_query ?? response?.query ?? query);
 
   useEffect(() => {
     const methods = dataset?.methods?.length ? dataset.methods : FALLBACK_METHODS;
@@ -81,6 +84,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setMethod(methods.includes(dataset?.default_method ?? '') ? dataset!.default_method : methods[0] ?? 'es_bm25');
     setQuery(suggestions[0].label);
     setQueryId(suggestions[0].queryId);
+    setSemanticMetadata(false);
     setMetadataFilters({});
     setResponse(null);
     setError(null);
@@ -93,6 +97,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setQueryId(preset.queryId);
     setMethod(nextMethod);
     setTopK(preset.topK);
+    setSemanticMetadata(false);
     setMetadataFilters({});
     setResponse(null);
     setError(null);
@@ -101,7 +106,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
       const runKey = `${preset.datasetId ?? dataset?.id ?? ''}:${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
       if (lastAutoRunKey.current !== runKey) {
         lastAutoRunKey.current = runKey;
-        runSearch(preset.query, preset.queryId, nextMethod, preset.topK, {});
+        runSearch(preset.query, preset.queryId, nextMethod, preset.topK, {}, false);
       }
     }
   }, [availableMethods, preset]);
@@ -110,7 +115,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setMetadataFilters((current) => ({ ...current, [key]: value }));
   }
 
-  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK, nextFilters = metadataFilters) {
+  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK, nextFilters = metadataFilters, nextSemanticMetadata = semanticMetadata) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
     if (!dataset) {
@@ -123,7 +128,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, activeFilters);
+      const payload = await searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, activeFilters, nextSemanticMetadata);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -181,7 +186,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 bg-surface-container-low/50 rounded-2xl border border-outline-variant shadow-inner">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 bg-surface-container-low/50 rounded-2xl border border-outline-variant shadow-inner">
           <ControlItem label="Retrieval Methodology">
             <select
               value={method}
@@ -208,6 +213,33 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
             <UnfoldMore className="absolute right-3 top-[2.65rem] pointer-events-none text-on-surface-variant" size={16} />
           </ControlItem>
 
+          <ControlItem label="Search Mode">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSemanticMetadata(false)}
+                disabled={isLoading}
+                className={cn(
+                  'h-10 rounded-lg border px-3 text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-60 disabled:cursor-wait',
+                  !semanticMetadata ? 'bg-primary text-on-primary border-primary shadow-sm' : 'bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary'
+                )}
+              >
+                Standard
+              </button>
+              <button
+                type="button"
+                onClick={() => setSemanticMetadata(true)}
+                disabled={isLoading}
+                className={cn(
+                  'h-10 rounded-lg border px-3 text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-60 disabled:cursor-wait',
+                  semanticMetadata ? 'bg-primary text-on-primary border-primary shadow-sm' : 'bg-white text-on-surface-variant border-outline-variant hover:border-primary hover:text-primary'
+                )}
+              >
+                Semantic Metadata
+              </button>
+            </div>
+          </ControlItem>
+
           <ControlItem label="Cache Policy">
             <div className="flex items-center gap-4 h-10">
               <div className="h-2 flex-1 bg-primary/20 rounded-full overflow-hidden">
@@ -217,7 +249,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
             </div>
           </ControlItem>
 
-          <div className="lg:col-span-3 border-t border-outline-variant/40 pt-4">
+          <div className="lg:col-span-4 border-t border-outline-variant/40 pt-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black opacity-70 px-1">Metadata Filters</span>
@@ -225,7 +257,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
                   'px-3 py-1 rounded font-mono text-[10px] font-black uppercase tracking-widest border',
                   metadataSupported ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-high text-on-surface-variant border-outline-variant'
                 )}>
-                  {metadataSupported ? 'HotpotQA enabled' : 'Metadata unsupported'}
+                  {metadataSupported ? 'Metadata enabled' : 'Metadata unsupported'}
                 </span>
               </div>
               {hasMetadataFilters && (
@@ -259,6 +291,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
 
       <section className="space-y-4">
         {response?.support && <SupportCoverage support={response.support} topK={response.top_k} />}
+        {response?.parsed_query && <ParsedQueryChips parsed={response.parsed_query} />}
         {isLoading && <SearchingIndicator />}
 
         <div className="flex items-center justify-between pb-3 border-b-4 border-outline-variant/20">
@@ -276,7 +309,7 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
 
         <div className="space-y-4">
           {response?.results.map((result) => (
-            <ResultCard key={`${result.doc_id}-${result.rank}`} result={result} />
+            <ResultCard key={`${result.doc_id}-${result.rank}`} result={result} highlightTerms={highlightTerms} />
           ))}
           {!response && !error && (
             <div className="bg-white border border-outline-variant rounded-xl p-6 text-on-surface-variant font-medium">
@@ -382,7 +415,25 @@ function SupportCoverage({ support, topK }: { support: SearchSupportSummary; top
   );
 }
 
-function ResultCard({ result }: { key?: string; result: SearchResult }) {
+function ParsedQueryChips({ parsed }: { parsed: ParsedMetadataQuery }) {
+  return (
+    <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Parsed Query</span>
+        {parsed.parsed_chips.map((chip) => (
+          <span key={chip} className="px-3 py-1 rounded border border-primary/20 bg-primary/10 text-primary font-mono text-[10px] font-black uppercase tracking-widest">
+            {chip}
+          </span>
+        ))}
+      </div>
+      {parsed.warnings.length > 0 && (
+        <div className="mt-3 text-xs text-on-surface-variant font-medium">{parsed.warnings.join(' ')}</div>
+      )}
+    </div>
+  );
+}
+
+function ResultCard({ result, highlightTerms }: { key?: string; result: SearchResult; highlightTerms: string[] }) {
   const isTop = result.rank === 1;
   return (
     <article className={cn(
@@ -395,17 +446,58 @@ function ResultCard({ result }: { key?: string; result: SearchResult }) {
           {result.is_support && <span className="px-4 py-1.5 rounded font-mono text-[10px] font-black tracking-widest uppercase bg-primary/10 text-primary border border-primary/20">Support Hit</span>}
           <span className="px-4 py-1.5 bg-surface-container-high text-on-surface-variant rounded font-mono text-[10px] font-black tracking-widest uppercase">HOP {result.hop}</span>
           <span className="ml-auto font-mono text-[10px] text-on-surface-variant font-bold opacity-40">UID: {result.doc_id}</span>
+          <ResultMetadata result={result} />
           <div className={cn('flex items-center gap-2 font-mono text-[10px] px-4 py-1.5 rounded-full font-black uppercase tracking-widest', isTop ? 'bg-primary/10 text-primary' : 'bg-surface-container-high text-on-surface')}>
             <Bolt size={14} /> Score: {result.score.toFixed(4)}
           </div>
         </div>
-        <h4 className={cn('font-headline text-2xl font-black transition-colors', isTop ? 'text-primary' : 'text-on-surface group-hover:text-primary')}>{result.title || result.doc_id}</h4>
-        <p className="text-sm text-on-surface-variant leading-relaxed max-w-6xl font-normal line-clamp-3">{result.text}</p>
+        <h4 className={cn('font-headline text-2xl font-black transition-colors', isTop ? 'text-primary' : 'text-on-surface group-hover:text-primary')}>
+          <HighlightText text={result.title || result.doc_id} terms={highlightTerms} />
+        </h4>
+        <p className="text-sm text-on-surface-variant leading-relaxed max-w-6xl font-normal line-clamp-3">
+          <HighlightText text={result.text} terms={highlightTerms} />
+        </p>
         <div className="flex items-center gap-4 pt-3 border-t border-outline-variant/10">
           <span className="text-[10px] font-mono text-on-surface-variant opacity-40 uppercase tracking-[0.25em] font-black">Source: Wikipedia (en)</span>
           <span className="text-[10px] font-mono text-on-surface-variant opacity-40 uppercase tracking-[0.25em] font-black border-l-2 pl-6 border-outline-variant/10">Method: {result.source}</span>
         </div>
       </div>
     </article>
+  );
+}
+
+function ResultMetadata({ result }: { result: SearchResult }) {
+  const metadata = [
+    ['Author', result.author],
+    ['Created', result.created_at],
+    ['Modified', result.modified_at],
+    ['Split', result.source_split],
+    ['Answer', result.answer],
+  ].filter(([, value]) => Boolean(value));
+
+  if (metadata.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {metadata.map(([label, value]) => (
+        <span key={label} className="px-3 py-1.5 rounded border border-outline-variant/40 bg-surface-container-low font-mono text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+          {label}: {value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HighlightText({ text, terms }: { text: string; terms: string[] }) {
+  return <>{splitHighlightedText(text, terms).map(renderHighlightSegment)}</>;
+}
+
+function renderHighlightSegment(segment: HighlightSegment, index: number) {
+  if (!segment.highlighted) return <span key={index}>{segment.text}</span>;
+
+  return (
+    <mark key={index} className="rounded bg-amber-100 px-0.5 font-black text-on-surface ring-1 ring-amber-200">
+      {segment.text}
+    </mark>
   );
 }

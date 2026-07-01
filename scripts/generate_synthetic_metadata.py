@@ -13,7 +13,7 @@ from src.data.synthetic_metadata import write_metadata_shards
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate deterministic synthetic HotpotQA metadata shards")
+    parser = argparse.ArgumentParser(description="Generate deterministic synthetic author/date metadata shards")
     parser.add_argument("--staging-dir", type=Path, default=Path("artifacts/hotpotqa_full/staging"))
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/hotpotqa_full/metadata"))
     parser.add_argument("--max-files", type=int, default=None)

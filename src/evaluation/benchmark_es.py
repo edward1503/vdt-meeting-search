@@ -14,6 +14,7 @@ from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
 
 METHOD_MAP = {
     "es_bm25": "bm25",
+    "es_bm25_title": "bm25_title",
     "es_dense": "dense",
     "es_hybrid": "hybrid",
     "es_iterative_hybrid": "iterative_hybrid",
@@ -21,7 +22,14 @@ METHOD_MAP = {
     "es_iterative_sentence": "iterative_sentence",
     "es_iterative_fast": "iterative_fast",
 }
-TURBOVEC_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "tv_two_hop_bridge_rrf", "tv_hybrid_rerank"}
+TURBOVEC_METHODS = {
+    "tv_dense",
+    "tv_hybrid",
+    "tv_filtered_hybrid",
+    "tv_two_hop_bridge_rrf",
+    "tv_bridge_title_entities_rrf",
+    "tv_hybrid_rerank",
+}
 DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 ITERATIVE_MODES = {
     "iterative_hybrid": "context",
@@ -217,6 +225,17 @@ def _search_method(
             )
         if method == "tv_two_hop_bridge_rrf":
             return retriever.search_two_hop_bridge_rrf(
+                query_text,
+                top_k,
+                hop1_top_k=first_hop_k,
+                hop2_top_k=second_hop_k,
+                beam_size=beam_size,
+                max_bridge_terms=max_bridge_terms,
+                candidate_k=candidate_k,
+                rrf_k=rrf_k,
+            )
+        if method == "tv_bridge_title_entities_rrf":
+            return retriever.search_bridge_title_entities_rrf(
                 query_text,
                 top_k,
                 hop1_top_k=first_hop_k,

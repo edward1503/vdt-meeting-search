@@ -102,7 +102,7 @@ DATASET_PROFILES: tuple[DatasetProfile, ...] = (
             ROOT_DIR / "evaluation" / "results" / "vimqa" / "dense_bkai_vimqa_full.json",
         ),
         readiness="ready",
-        supports_metadata_filters=False,
+        supports_metadata_filters=True,
         primary_metric="recall@10",
     ),
 )

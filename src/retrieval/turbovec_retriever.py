@@ -12,6 +12,7 @@ from src.retrieval.elasticsearch_retriever import fuse_rrf
 from src.retrieval.reranker import CrossEncoderReranker, dedupe_hits, rerank_hits
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+CAPITALIZED_SPAN_RE = re.compile(r"\b[A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*\b")
 
 
 class RemoteEmbeddingClient:
@@ -263,6 +264,68 @@ class TurboVecHybridRetriever:
                 break
         return flattened
 
+    def search_bridge_title_entities_rrf(
+        self,
+        query: str,
+        top_k: int,
+        hop1_top_k: int = 5,
+        hop2_top_k: int = 10,
+        beam_size: int = 3,
+        max_bridge_terms: int = 8,
+        candidate_k: int = 100,
+        rrf_k: int = 60,
+    ) -> list[dict[str, Any]]:
+        hop1_hits = self.search(query, "tv_hybrid", hop1_top_k, candidate_k=candidate_k, rrf_k=rrf_k)
+        chains: list[dict[str, Any]] = []
+
+        for hop1_rank, hop1_hit in enumerate(hop1_hits[:beam_size], start=1):
+            hop1_doc_id = str(hop1_hit.get("doc_id", ""))
+            bridge_query = self._build_title_entity_bridge_query(query, hop1_hit, max_bridge_terms=max_bridge_terms)
+            hop2_hits = self.search(bridge_query, "tv_hybrid", hop2_top_k, candidate_k=candidate_k, rrf_k=rrf_k)
+            for hop2_rank, hop2_hit in enumerate(hop2_hits, start=1):
+                hop2_doc_id = str(hop2_hit.get("doc_id", ""))
+                if not hop1_doc_id or not hop2_doc_id or hop2_doc_id == hop1_doc_id:
+                    continue
+                chains.append(
+                    {
+                        "score": (1.0 / (rrf_k + hop1_rank)) + (1.0 / (rrf_k + hop2_rank)),
+                        "hits": [hop1_hit, hop2_hit],
+                        "doc_ids": [hop1_doc_id, hop2_doc_id],
+                    }
+                )
+
+        ranked_chains = sorted(chains, key=lambda item: item["score"], reverse=True)
+        flattened: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for chain_rank, chain in enumerate(ranked_chains, start=1):
+            for hop, hit in enumerate(chain["hits"], start=1):
+                doc_id = str(hit.get("doc_id", ""))
+                if not doc_id or doc_id in seen:
+                    continue
+                seen.add(doc_id)
+                flattened.append(
+                    {
+                        **hit,
+                        "score": float(chain["score"]),
+                        "source": "bridge_title_entities_rrf",
+                        "hop": hop,
+                        "chain_rank": chain_rank,
+                        "chain_doc_ids": list(chain["doc_ids"]),
+                    }
+                )
+                if len(flattened) >= top_k:
+                    return flattened
+
+        for hit in hop1_hits:
+            doc_id = str(hit.get("doc_id", ""))
+            if not doc_id or doc_id in seen:
+                continue
+            seen.add(doc_id)
+            flattened.append({**hit, "source": "bridge_title_entities_rrf", "hop": 1})
+            if len(flattened) >= top_k:
+                break
+        return flattened
+
     def _build_bridge_query(self, query: str, hit: dict[str, Any], max_bridge_terms: int) -> str:
         title = str(hit.get("title", "") or "").strip()
         query_terms = {token.lower() for token in TOKEN_RE.findall(query)}
@@ -278,6 +341,37 @@ class TurboVecHybridRetriever:
             if len(bridge_terms) >= max_bridge_terms:
                 break
         return " ".join(part for part in [query, title, " ".join(bridge_terms)] if part)
+
+    def _build_title_entity_bridge_query(self, query: str, hit: dict[str, Any], max_bridge_terms: int) -> str:
+        query_terms = {token.lower() for token in TOKEN_RE.findall(query)}
+        bridge_terms: list[str] = []
+        seen: set[str] = set()
+
+        def add_token(token: str) -> bool:
+            token_key = token.lower()
+            if token_key in query_terms or token_key in seen or len(token_key) < 3:
+                return False
+            seen.add(token_key)
+            bridge_terms.append(token)
+            return len(bridge_terms) >= max_bridge_terms
+
+        for token in TOKEN_RE.findall(str(hit.get("title", "") or "")):
+            if add_token(token):
+                return " ".join([query, " ".join(bridge_terms)])
+
+        text = str(hit.get("text", "") or "")
+        for span in CAPITALIZED_SPAN_RE.findall(text):
+            span_tokens = TOKEN_RE.findall(span)
+            if len(span_tokens) == 1:
+                continue
+            for token in span_tokens:
+                if add_token(token):
+                    return " ".join([query, " ".join(bridge_terms)])
+
+        for token in TOKEN_RE.findall(text):
+            if add_token(token):
+                break
+        return " ".join(part for part in [query, " ".join(bridge_terms)] if part)
 
     def _embed_query(self, query: str) -> np.ndarray:
         vector = self.embedder.encode([query], normalize_embeddings=True, convert_to_numpy=True)

@@ -254,7 +254,9 @@ class ElasticsearchRetriever:
 
 
 METADATA_FIELDS = ['author', 'created_at', 'modified_at', 'source_split', 'answer']
+TITLE_AWARE_FIELDS = ['title_exact', 'lead_sentence', 'title_repeat_content']
 BM25_SOURCE_FIELDS = ['numeric_id', 'doc_id', 'title', 'text', 'url', *METADATA_FIELDS]
+TITLE_AWARE_BM25_SOURCE_FIELDS = [*BM25_SOURCE_FIELDS, *TITLE_AWARE_FIELDS]
 
 
 def metadata_mapping_properties() -> dict[str, Any]:
@@ -290,7 +292,7 @@ def build_metadata_filter_clauses(metadata_filters: dict[str, Any] | None = None
     return clauses
 
 
-def build_bm25_index_body(shards: int = 1, include_metadata: bool = False) -> dict[str, Any]:
+def build_bm25_index_body(shards: int = 1, include_metadata: bool = False, title_aware: bool = False) -> dict[str, Any]:
     properties = {
         'numeric_id': {'type': 'long'},
         'doc_id': {'type': 'keyword'},
@@ -299,6 +301,14 @@ def build_bm25_index_body(shards: int = 1, include_metadata: bool = False) -> di
         'url': {'type': 'keyword'},
         'content': {'type': 'text'},
     }
+    if title_aware:
+        properties.update(
+            {
+                'title_exact': {'type': 'keyword'},
+                'lead_sentence': {'type': 'text'},
+                'title_repeat_content': {'type': 'text'},
+            }
+        )
     if include_metadata:
         properties.update(metadata_mapping_properties())
 
@@ -308,7 +318,7 @@ def build_bm25_index_body(shards: int = 1, include_metadata: bool = False) -> di
     }
 
 
-def bm25_bulk_action(index: str, row: dict[str, Any]) -> dict[str, Any]:
+def bm25_bulk_action(index: str, row: dict[str, Any], title_aware: bool = False) -> dict[str, Any]:
     action = {
         '_index': index,
         '_id': row['doc_id'],
@@ -319,6 +329,12 @@ def bm25_bulk_action(index: str, row: dict[str, Any]) -> dict[str, Any]:
         'url': row.get('url', ''),
         'content': row.get('content', ''),
     }
+    if title_aware:
+        title = str(row.get('title', '') or '')
+        text = str(row.get('text', '') or '')
+        action['title_exact'] = title
+        action['lead_sentence'] = _lead_sentence(text)
+        action['title_repeat_content'] = _title_repeat_content(title, text)
     for field in METADATA_FIELDS:
         value = row.get(field)
         if value:
@@ -338,6 +354,23 @@ def build_bm25_query(query: str, top_k: int, metadata_filters: dict[str, Any] | 
         'query': query_body,
     }
 
+def build_title_aware_bm25_query(query: str, top_k: int, metadata_filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    query_clause = {
+        'multi_match': {
+            'query': query,
+            'fields': ['title^3', 'title_exact^4', 'title_repeat_content^1.5', 'lead_sentence^1.2', 'content'],
+        }
+    }
+    filter_clauses = build_metadata_filter_clauses(metadata_filters)
+    query_body = {'bool': {'must': [query_clause], 'filter': filter_clauses}} if filter_clauses else query_clause
+
+    return {
+        'size': top_k,
+        'track_total_hits': False,
+        '_source': TITLE_AWARE_BM25_SOURCE_FIELDS,
+        'query': query_body,
+    }
+
 
 def _elasticsearch_retriever_search(
     self: ElasticsearchRetriever,
@@ -350,6 +383,8 @@ def _elasticsearch_retriever_search(
 ) -> list[dict[str, Any]]:
     if method == 'bm25':
         return self._search_body(build_bm25_query(query, top_k, metadata_filters=metadata_filters), 'bm25')
+    if method == 'bm25_title':
+        return self._search_body(build_title_aware_bm25_query(query, top_k, metadata_filters=metadata_filters), 'bm25_title')
     if method == 'dense':
         return self._search_dense(query, top_k, self.num_candidates)
     if method == 'hybrid':
@@ -402,4 +437,11 @@ def _vector_to_list(vector: Any) -> list[float]:
     if hasattr(vector, "tolist"):
         return [float(value) for value in vector.tolist()]
     return [float(value) for value in vector]
+
+def _lead_sentence(text: str) -> str:
+    sentences = [sentence.strip().rstrip('.') for sentence in SENTENCE_RE.split(text) if sentence.strip()]
+    return sentences[0] if sentences else str(text or '').strip()
+
+def _title_repeat_content(title: str, text: str) -> str:
+    return '\n'.join(part for part in [title, title, text] if part)
 

@@ -1,0 +1,11 @@
+{
+  "content_only_original": {
+    "recall@1": 0.0
+  },
+  "manual_filter": {
+    "recall@1": 1.0
+  },
+  "parsed_metadata": {
+    "recall@1": 1.0
+  }
+}

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import sys
 from types import ModuleType
 
@@ -51,3 +52,11 @@ def test_embedding_server_rejects_unknown_model_id():
     response = client.post("/embed", json={"text": "hello", "model_id": "missing"})
 
     assert response.status_code == 404
+
+def test_embedding_endpoint_runs_on_event_loop_thread_for_cuda():
+    from scripts.embedding_server import create_app
+
+    app = create_app(device="cuda", warmup=False)
+    embed_route = next(route for route in app.routes if getattr(route, "path", "") == "/embed")
+
+    assert inspect.iscoroutinefunction(embed_route.endpoint)
