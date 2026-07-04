@@ -15,6 +15,17 @@ COMPOSE_SERVICES="elasticsearch redis api frontend"
 PID_FILE=".runtime/embedding_server.pid"
 STDOUT_LOG="logs/embedding_server.stdout.log"
 STDERR_LOG="logs/embedding_server.stderr.log"
+if [ "${FRONTEND_PORT+x}" = x ]; then
+  FRONTEND_PORT_WAS_SET=1
+else
+  FRONTEND_PORT=3001
+  FRONTEND_PORT_WAS_SET=0
+fi
+if [ "${FRONTEND_URL+x}" = x ]; then
+  FRONTEND_URL_WAS_SET=1
+else
+  FRONTEND_URL_WAS_SET=0
+fi
 
 log() {
   printf '%s\n' "[start] $*"
@@ -45,8 +56,20 @@ stop_process() {
   fi
 }
 
-is_port_open() {
-  "$PYTHON_BIN" - "$EMBEDDING_PORT" <<'PY'
+start_embedding_service() {
+  device="$1"
+  log "Starting host embedding service on port $EMBEDDING_PORT using device $device"
+  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0} "$PYTHON_BIN" scripts/embedding_server.py \
+    --host "$EMBEDDING_HOST" \
+    --port "$EMBEDDING_PORT" \
+    --device "$device" \
+    --no-warmup \
+    >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+  echo "$!" >"$PID_FILE"
+}
+
+is_tcp_port_open() {
+  "$PYTHON_BIN" - "$1" <<'PY'
 import socket
 import sys
 
@@ -55,6 +78,43 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
     sock.settimeout(0.5)
     sys.exit(0 if sock.connect_ex(("127.0.0.1", port)) == 0 else 1)
 PY
+}
+
+is_port_open() {
+  is_tcp_port_open "$EMBEDDING_PORT"
+}
+
+refresh_frontend_url() {
+  if [ "$FRONTEND_URL_WAS_SET" -eq 0 ]; then
+    FRONTEND_URL="http://localhost:${FRONTEND_PORT}"
+  fi
+}
+
+choose_frontend_port() {
+  if [ "$FRONTEND_PORT_WAS_SET" -eq 1 ]; then
+    export FRONTEND_PORT
+    refresh_frontend_url
+    return 0
+  fi
+
+  if ! is_tcp_port_open "$FRONTEND_PORT"; then
+    export FRONTEND_PORT
+    refresh_frontend_url
+    return 0
+  fi
+
+  for candidate in 3011 3012 3013 3014 3015; do
+    if ! is_tcp_port_open "$candidate"; then
+      log "Frontend host port $FRONTEND_PORT is busy; using $candidate"
+      FRONTEND_PORT="$candidate"
+      export FRONTEND_PORT
+      refresh_frontend_url
+      return 0
+    fi
+  done
+
+  printf '%s\n' "Frontend ports 3001 and 3011-3015 are occupied" >&2
+  exit 1
 }
 
 health_ready() {
@@ -102,13 +162,50 @@ request = urllib.request.Request(
     headers={"Content-Type": "application/json"},
     method="POST",
 )
-with urllib.request.urlopen(request, timeout=120) as response:
-    payload = json.loads(response.read().decode("utf-8"))
+try:
+    with urllib.request.urlopen(request, timeout=120) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+except Exception as exc:
+    raise SystemExit(f"embedding warmup failed for {model_id or 'hotpotqa'}: {exc}")
 dim = len(payload.get("embedding", []))
 if dim != expected_dim:
     raise SystemExit(f"expected {expected_dim} dims for {model_id or 'hotpotqa'}, got {dim}")
 print(f"{model_id or 'hotpotqa'} dim={dim}")
 PY
+}
+
+warm_models() {
+  log "Warming HotpotQA embedding model"
+  if ! warm_embedding_model "" 384 "what connects alpha and beta"; then
+    return 1
+  fi
+  log "Warming VimQA embedding model"
+  warm_embedding_model "vimqa" 768 "xin chao"
+}
+
+warm_models_or_fallback() {
+  if warm_models; then
+    return 0
+  fi
+
+  if [ "$EMBEDDING_DEVICE" != "cuda" ]; then
+    return 1
+  fi
+
+  log "CUDA embedding warmup failed. Retrying embedding service on CPU"
+  if [ -f "$PID_FILE" ]; then
+    old_pid=$(cat "$PID_FILE")
+    if [ -n "$old_pid" ]; then
+      stop_process "$old_pid"
+      sleep 2
+    fi
+    rm -f "$PID_FILE"
+  fi
+
+  EMBEDDING_DEVICE="cpu"
+  start_embedding_service "$EMBEDDING_DEVICE"
+  wait_for_health
+  warm_models
 }
 
 wait_for_api() {
@@ -193,8 +290,7 @@ if [ -f "$PID_FILE" ]; then
         sleep 2
         ;;
       *)
-        printf '%s\n' "PID file points to a non-embedding process: $old_pid" >&2
-        exit 1
+        log "Ignoring stale embedding PID file for non-embedding process $old_pid"
         ;;
     esac
   fi
@@ -209,21 +305,12 @@ if is_port_open; then
     exit 1
   fi
 else
-  log "Starting host GPU embedding service on port $EMBEDDING_PORT"
-  CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0} "$PYTHON_BIN" scripts/embedding_server.py \
-    --host "$EMBEDDING_HOST" \
-    --port "$EMBEDDING_PORT" \
-    --device "$EMBEDDING_DEVICE" \
-    --no-warmup \
-    >"$STDOUT_LOG" 2>"$STDERR_LOG" &
-  echo "$!" >"$PID_FILE"
+  start_embedding_service "$EMBEDDING_DEVICE"
 fi
 
 wait_for_health
-log "Warming HotpotQA embedding model"
-warm_embedding_model "" 384 "what connects alpha and beta"
-log "Warming VimQA embedding model"
-warm_embedding_model "vimqa" 768 "xin chao"
+warm_models_or_fallback
+choose_frontend_port
 
 missing_services=$(missing_compose_services)
 if [ -n "$missing_services" ]; then
@@ -244,5 +331,5 @@ log "Smoke testing HotpotQA tv_hybrid"
 smoke_search "hotpotqa" "tv_hybrid" "Who founded Microsoft?"
 
 log "Startup complete"
-log "Frontend: http://localhost:3001"
+log "Frontend: $FRONTEND_URL"
 log "FastAPI:  http://localhost:8001/docs"
