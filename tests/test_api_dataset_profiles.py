@@ -15,7 +15,7 @@ def test_dataset_registry_exposes_hotpotqa_and_vimqa_profiles() -> None:
     assert hotpotqa.label == "HotpotQA Full Corpus"
     assert hotpotqa.language == "en"
     assert hotpotqa.index == "hotpotqa_full_bm25_current"
-    assert hotpotqa.methods == ("es_bm25", "tv_dense", "tv_hybrid", "tv_filtered_hybrid")
+    assert hotpotqa.methods == ("tv_hybrid", "tv_bridge_title_entities_rrf")
     assert hotpotqa.default_method == "tv_hybrid"
     assert hotpotqa.dense_backend == "turbovec"
     assert hotpotqa.embedding_model == "BAAI/bge-small-en-v1.5"

@@ -232,8 +232,8 @@ export function QueriesView({ dataset, onSearchQuery }: QueriesViewProps) {
         <div className="p-4 border-t border-outline-variant bg-white space-y-2 shadow-[0_-4px_12px_rgba(0,0,0,0.02)]">
           {runState && <div className="text-[10px] font-mono text-primary font-bold uppercase tracking-widest truncate">{runState}</div>}
           <div className="grid grid-cols-3 gap-2">
-            <CompactActionButton Icon={Bolt} label="Run Default" primary onClick={() => handoffSelectedSearch(dataset?.default_method ?? 'es_bm25')} />
-            <CompactActionButton Icon={Route} label="BM25" onClick={() => handoffSelectedSearch('es_bm25')} />
+            <CompactActionButton Icon={Bolt} label="Run Default" primary onClick={() => handoffSelectedSearch(dataset?.default_method ?? 'tv_hybrid')} />
+            <CompactActionButton Icon={Route} label="Best Beam" onClick={() => handoffSelectedSearch(dataset?.methods.includes('tv_bridge_title_entities_rrf') ? 'tv_bridge_title_entities_rrf' : dataset?.default_method ?? 'tv_hybrid')} />
             <CompactActionButton Icon={ExportNotes} label="Export" onClick={() => setRunState('Export uses current query page.')} />
           </div>
         </div>

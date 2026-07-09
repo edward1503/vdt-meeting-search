@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Search, UnfoldMore, Verified, Bolt, KeyboardDoubleArrowDown } from '@/src/components/Icons';
 import { cn } from '@/src/lib/utils';
-import { searchDataset, type ParsedMetadataQuery, type SearchFilters, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
+import { searchDataset, type ParsedMetadataQuery, type RetrievalTraceStep, type SearchResult, type SearchResponse, type SearchSupportSummary } from '@/src/lib/api';
 import { buildHighlightTerms, splitHighlightedText, type HighlightSegment } from '@/src/lib/highlight';
 import type { DatasetProfile, SearchPreset } from '@/src/types';
 
@@ -27,37 +27,19 @@ const VIMQA_SUGGESTIONS: SearchSuggestion[] = [
 ];
 
 const METHOD_LABELS: Record<string, string> = {
-  tv_hybrid: 'TurboVec Hybrid RRF (Full Dense + BM25)',
-  tv_dense: 'TurboVec Dense (Vector Only)',
-  tv_filtered_hybrid: 'Filtered TurboVec Hybrid',
-  es_bm25: 'Standard BM25 (Keyword Only)',
+  tv_hybrid: 'TurboVec Hybrid RRF',
+  tv_bridge_title_entities_rrf: 'Bridge Beam1 Terms6',
   es_dense: 'Elasticsearch Dense Vector',
   es_hybrid: 'Elasticsearch Hybrid RRF',
 };
 
-const FALLBACK_METHODS = ['tv_hybrid', 'tv_dense', 'tv_filtered_hybrid', 'es_bm25'];
-
-const METADATA_FIELDS: { key: keyof SearchFilters; label: string; type: string; placeholder?: string }[] = [
-  { key: 'author', label: 'Author', type: 'text', placeholder: 'Nguyen An' },
-  { key: 'created_at_from', label: 'Created from', type: 'date' },
-  { key: 'created_at_to', label: 'Created to', type: 'date' },
-  { key: 'modified_at_from', label: 'Modified from', type: 'date' },
-  { key: 'modified_at_to', label: 'Modified to', type: 'date' },
-];
+const FALLBACK_METHODS = ['tv_hybrid', 'tv_bridge_title_entities_rrf'];
 
 function methodOptions(methods?: string[]) {
   return (methods && methods.length ? methods : FALLBACK_METHODS).map((value) => ({
     value,
     label: METHOD_LABELS[value] ?? value,
   }));
-}
-
-function compactMetadataFilters(filters: SearchFilters): SearchFilters {
-  return Object.fromEntries(
-    Object.entries(filters)
-      .map(([key, value]) => [key, value?.trim() ?? ''])
-      .filter(([, value]) => value.length > 0)
-  ) as SearchFilters;
 }
 
 export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null; preset?: SearchPreset | null }) {
@@ -68,14 +50,10 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
   const [method, setMethod] = useState('tv_hybrid');
   const [topK, setTopK] = useState(10);
   const [semanticMetadata, setSemanticMetadata] = useState(false);
-  const [metadataFilters, setMetadataFilters] = useState<SearchFilters>({});
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastAutoRunKey = useRef<string | null>(null);
-  const metadataSupported = Boolean(dataset?.supports_metadata_filters);
-  const activeMetadataFilters = metadataSupported ? compactMetadataFilters(metadataFilters) : {};
-  const hasMetadataFilters = Object.keys(activeMetadataFilters).length > 0;
   const highlightTerms = buildHighlightTerms(response?.effective_query ?? response?.query ?? query);
 
   useEffect(() => {
@@ -85,7 +63,6 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setQuery(suggestions[0].label);
     setQueryId(suggestions[0].queryId);
     setSemanticMetadata(false);
-    setMetadataFilters({});
     setResponse(null);
     setError(null);
   }, [dataset?.id]);
@@ -98,7 +75,6 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
     setMethod(nextMethod);
     setTopK(preset.topK);
     setSemanticMetadata(false);
-    setMetadataFilters({});
     setResponse(null);
     setError(null);
 
@@ -106,16 +82,12 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
       const runKey = `${preset.datasetId ?? dataset?.id ?? ''}:${preset.id ?? ''}:${preset.queryId ?? preset.query}:${nextMethod}:${preset.topK}`;
       if (lastAutoRunKey.current !== runKey) {
         lastAutoRunKey.current = runKey;
-        runSearch(preset.query, preset.queryId, nextMethod, preset.topK, {}, false);
+        runSearch(preset.query, preset.queryId, nextMethod, preset.topK, false);
       }
     }
   }, [availableMethods, preset]);
 
-  function updateMetadataFilter(key: keyof SearchFilters, value: string) {
-    setMetadataFilters((current) => ({ ...current, [key]: value }));
-  }
-
-  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK, nextFilters = metadataFilters, nextSemanticMetadata = semanticMetadata) {
+  async function runSearch(nextQuery = query, nextQueryId = queryId, nextMethod = method, nextTopK = topK, nextSemanticMetadata = semanticMetadata) {
     const trimmed = nextQuery.trim();
     if (!trimmed) return;
     if (!dataset) {
@@ -123,12 +95,10 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
       return;
     }
 
-    const activeFilters = dataset.supports_metadata_filters ? compactMetadataFilters(nextFilters) : {};
-
     setIsLoading(true);
     setError(null);
     try {
-      const payload = await searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, activeFilters, nextSemanticMetadata);
+      const payload = await searchDataset(dataset.id, trimmed, nextMethod, nextTopK, nextQueryId, {}, nextSemanticMetadata);
       setResponse(payload);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
@@ -248,50 +218,13 @@ export function SearchView({ dataset, preset }: { dataset: DatasetProfile | null
               <span className="font-mono text-xs bg-on-background text-surface px-3 py-1.5 rounded-lg font-black shadow-lg">Redis TTL</span>
             </div>
           </ControlItem>
-
-          <div className="lg:col-span-4 border-t border-outline-variant/40 pt-4">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black opacity-70 px-1">Metadata Filters</span>
-                <span className={cn(
-                  'px-3 py-1 rounded font-mono text-[10px] font-black uppercase tracking-widest border',
-                  metadataSupported ? 'bg-primary/10 text-primary border-primary/20' : 'bg-surface-container-high text-on-surface-variant border-outline-variant'
-                )}>
-                  {metadataSupported ? 'Metadata enabled' : 'Metadata unsupported'}
-                </span>
-              </div>
-              {hasMetadataFilters && (
-                <button
-                  type="button"
-                  onClick={() => setMetadataFilters({})}
-                  disabled={isLoading}
-                  className="px-3 py-1.5 rounded border border-outline-variant bg-white text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:text-primary hover:border-primary transition-colors disabled:opacity-60 disabled:cursor-wait"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-              {METADATA_FIELDS.map((field) => (
-                <ControlItem key={field.key} label={field.label}>
-                  <input
-                    type={field.type}
-                    value={metadataFilters[field.key] ?? ''}
-                    placeholder={field.placeholder}
-                    disabled={isLoading || !metadataSupported}
-                    onChange={(event) => updateMetadataFilter(field.key, event.target.value)}
-                    className="w-full bg-white border border-outline-variant rounded-lg px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-primary outline-none font-mono tracking-tight disabled:bg-surface-container-low disabled:text-on-surface-variant disabled:opacity-70 disabled:cursor-not-allowed"
-                  />
-                </ControlItem>
-              ))}
-            </div>
-          </div>
         </div>
       </section>
 
       <section className="space-y-4">
         {response?.support && <SupportCoverage support={response.support} topK={response.top_k} />}
         {response?.parsed_query && <ParsedQueryChips parsed={response.parsed_query} />}
+        {response?.retrieval_trace && <RetrievalTrace steps={response.retrieval_trace} />}
         {isLoading && <SearchingIndicator />}
 
         <div className="flex items-center justify-between pb-3 border-b-4 border-outline-variant/20">
@@ -357,21 +290,92 @@ function ControlItem({ label, children }: { key?: string; label: string; childre
 }
 
 function SearchingIndicator() {
+  const loadingSteps = ['BM25 Search', 'BGE Query Embedding', 'TurboVec Dense Search', 'RRF Fusion', 'Support Overlay'];
+
   return (
     <div className="bg-white border border-outline-variant rounded-xl p-4 shadow-sm overflow-hidden">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="h-4 w-4 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
         <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Searching</span>
       </div>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="h-3 rounded-full bg-surface-container-high overflow-hidden">
-            <div className="h-full w-2/3 rounded-full bg-primary/30 animate-pulse" />
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-2">
+        {loadingSteps.map((step) => (
+          <div key={step} className="rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2">
+            <div className="h-1.5 rounded-full bg-primary/20 overflow-hidden">
+              <div className="h-full w-2/3 rounded-full bg-primary/40 animate-pulse" />
+            </div>
+            <div className="mt-2 truncate font-label text-[9px] font-black uppercase tracking-widest text-on-surface-variant">{step}</div>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function RetrievalTrace({ steps }: { steps: RetrievalTraceStep[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="bg-white border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+      <button
+        type="button"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((current) => !current)}
+        className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-container-low transition-colors"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest font-black">Search Pipeline</span>
+          <span className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded font-mono text-[10px] font-black uppercase tracking-widest">
+            Retrieval Trace
+          </span>
+          <span className="font-mono text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+            {steps.length} steps
+          </span>
+        </div>
+        <span className="flex items-center gap-2 font-mono text-[10px] font-black uppercase tracking-widest text-on-surface-variant">
+          {isOpen ? 'Hide' : 'Show'}
+          <UnfoldMore size={16} />
+        </span>
+      </button>
+      {isOpen && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 border-t border-outline-variant/40 p-4">
+          {steps.map((step) => (
+            <div key={step.step} className="rounded-lg border border-outline-variant/50 bg-surface-container-low p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate font-label text-[10px] font-black uppercase tracking-widest text-on-surface">
+                    {traceDisplayLabel(step.label)}
+                  </div>
+                  <div className="mt-1 text-xs font-medium leading-snug text-on-surface-variant">{step.summary}</div>
+                </div>
+                <span className="shrink-0 rounded bg-white px-2 py-1 font-mono text-[10px] font-black text-primary ring-1 ring-primary/20">
+                  {formatTraceMs(step.elapsed_ms)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function traceDisplayLabel(label: string) {
+  const labels: Record<string, string> = {
+    'Elasticsearch BM25 search': 'BM25 Search',
+    'BGE query embedding': 'BGE Query Embedding',
+    'TurboVec dense search': 'TurboVec Dense Search',
+    'RRF fusion': 'RRF Fusion',
+    'Support overlay': 'Support Overlay',
+  };
+  return labels[label] ?? label;
+}
+
+function formatTraceMs(value: number | null) {
+  if (value === null) return '-';
+  if (value < 10) return `${value.toFixed(1)}ms`;
+  return `${Math.round(value)}ms`;
 }
 
 function SupportCoverage({ support, topK }: { support: SearchSupportSummary; topK: number }) {

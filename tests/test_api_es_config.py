@@ -478,8 +478,8 @@ def test_api_exposes_turbovec_methods_and_settings():
     settings = Settings()
     stats_methods = set(main.stats()["methods"])
 
-    assert {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(main.METHODS)
-    assert {"es_bm25", "tv_dense", "tv_hybrid", "tv_filtered_hybrid"}.issubset(stats_methods)
+    assert {"tv_hybrid", "tv_bridge_title_entities_rrf"}.issubset(main.METHODS)
+    assert stats_methods == {"tv_hybrid", "tv_bridge_title_entities_rrf"}
     assert {"es_dense", "es_hybrid", "es_iterative_hybrid"}.isdisjoint(stats_methods)
     assert settings.default_search_method == "tv_hybrid"
     assert main.SearchRequest(query="Who connects Alpha and Beta?").method == "tv_hybrid"
@@ -539,7 +539,130 @@ def test_search_routes_turbovec_methods_to_turbovec_retriever(monkeypatch):
     assert response["method"] == "tv_hybrid"
     assert response["history_id"] == 123
     assert response["latency_breakdown_ms"] == {"embed": 1.0, "bm25": 2.0, "turbovec": 3.0, "fusion": 4.0, "hydrate": 5.0}
+    assert response["retrieval_trace"] == [
+        {
+            "step": "metadata_parse",
+            "label": "Parse query / metadata intent",
+            "status": "completed",
+            "elapsed_ms": None,
+            "summary": "No metadata filters",
+        },
+        {
+            "step": "bm25",
+            "label": "Elasticsearch BM25 search",
+            "status": "completed",
+            "elapsed_ms": 2.0,
+            "summary": "Keyword candidate retrieval",
+        },
+        {
+            "step": "query_embedding",
+            "label": "BGE query embedding",
+            "status": "completed",
+            "elapsed_ms": 1.0,
+            "summary": "Query text converted to vector",
+        },
+        {
+            "step": "dense",
+            "label": "TurboVec dense search",
+            "status": "completed",
+            "elapsed_ms": 3.0,
+            "summary": "Vector candidate retrieval",
+        },
+        {
+            "step": "fusion",
+            "label": "RRF fusion",
+            "status": "completed",
+            "elapsed_ms": 4.0,
+            "summary": "BM25 and dense rankings fused",
+        },
+        {
+            "step": "hydration",
+            "label": "Hydrate documents",
+            "status": "completed",
+            "elapsed_ms": 5.0,
+            "summary": "Loaded title, content, and metadata",
+        },
+        {
+            "step": "support_overlay",
+            "label": "Support overlay",
+            "status": "completed",
+            "elapsed_ms": None,
+            "summary": "Gold support unavailable",
+        },
+    ]
     assert response["results"][0]["source"] == "bm25+dense"
+
+def test_search_routes_best_bridge_beam_to_turbovec_retriever(monkeypatch):
+    from src.api import main
+
+    calls = []
+
+    class FakeTVRetriever:
+        last_timing_ms = {"hop1": 10.0, "hop2": 20.0}
+
+        def search_bridge_title_entities_rrf(
+            self,
+            query,
+            top_k,
+            *,
+            beam_size,
+            max_bridge_terms,
+            candidate_k,
+            rrf_k,
+        ):
+            calls.append(
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "beam_size": beam_size,
+                    "max_bridge_terms": max_bridge_terms,
+                    "candidate_k": candidate_k,
+                    "rrf_k": rrf_k,
+                }
+            )
+            return [
+                {
+                    "doc_id": "d1",
+                    "title": "Bridge Doc",
+                    "text": "body",
+                    "url": "",
+                    "score": 1.0,
+                    "source": "bridge_title_entities_rrf",
+                }
+            ]
+
+    class FakeHistoryStore:
+        def record_search(self, **kwargs):
+            return 456
+
+    monkeypatch.setattr(main, "read_search_cache", lambda cache_key: None)
+    monkeypatch.setattr(main, "write_search_cache", lambda cache_key, payload: None)
+    monkeypatch.setattr(main, "get_history_store", lambda: FakeHistoryStore())
+    monkeypatch.setattr(main, "find_support_doc_ids", lambda query, query_id=None: [])
+    monkeypatch.setattr(main, "get_tv_retriever", lambda: FakeTVRetriever())
+
+    response = main.search(
+        main.SearchRequest(
+            query="Who connects Alpha and Beta?",
+            method="tv_bridge_title_entities_rrf",
+            top_k=2,
+        )
+    )
+
+    assert calls == [
+        {
+            "query": "Who connects Alpha and Beta?",
+            "top_k": 2,
+            "beam_size": 1,
+            "max_bridge_terms": 6,
+            "candidate_k": 100,
+            "rrf_k": 60,
+        }
+    ]
+    assert response["method"] == "tv_bridge_title_entities_rrf"
+    assert response["history_id"] == 456
+    assert response["latency_breakdown_ms"] == {"hop1": 10.0, "hop2": 20.0}
+    assert response["results"][0]["source"] == "bridge_title_entities_rrf"
 
 
 def test_search_returns_support_summary_and_marks_support_hits(monkeypatch):

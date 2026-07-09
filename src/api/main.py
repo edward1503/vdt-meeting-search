@@ -31,7 +31,7 @@ FILTERED_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "hotpotqa
 LEGACY_BENCHMARK_RESULT_PATH = ROOT_DIR / "evaluation" / "results" / "es_nano_iterative.json"
 
 ES_METHODS = {"es_bm25"}
-TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}
+TV_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "tv_bridge_title_entities_rrf"}
 DENSE_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "es_dense", "es_hybrid"}
 ES_METHOD_MAP = {
     "es_bm25": "bm25",
@@ -251,6 +251,120 @@ def build_support_summary(support_doc_ids: list[str], result_doc_ids: list[str])
         "total_count": total_count,
         "recall_at_k": round(matched_count / total_count, 4) if total_count else None,
     }
+
+def timing_ms(latency_breakdown_ms: dict[str, float] | None, *keys: str) -> float | None:
+    if latency_breakdown_ms is None:
+        return None
+    for key in keys:
+        if key in latency_breakdown_ms:
+            return round(float(latency_breakdown_ms[key]), 4)
+    return None
+
+def trace_step(step: str, label: str, elapsed_ms: float | None, summary: str) -> dict[str, Any]:
+    return {
+        "step": step,
+        "label": label,
+        "status": "completed",
+        "elapsed_ms": elapsed_ms,
+        "summary": summary,
+    }
+
+def build_retrieval_trace(
+    *,
+    execution_plan: SearchExecutionPlan,
+    effective_method: str,
+    latency_ms: float,
+    latency_breakdown_ms: dict[str, float] | None,
+    support_summary: dict[str, Any],
+) -> list[dict[str, Any]]:
+    metadata_summary = (
+        f"{len(execution_plan.metadata_filters)} metadata filter(s) applied"
+        if execution_plan.metadata_filters
+        else "No metadata filters"
+    )
+    trace = [
+        trace_step(
+            "metadata_parse",
+            "Parse query / metadata intent",
+            None,
+            metadata_summary,
+        )
+    ]
+
+    if effective_method in {"es_bm25", "tv_hybrid", "tv_filtered_hybrid"}:
+        trace.append(
+            trace_step(
+                "bm25",
+                "Elasticsearch BM25 search",
+                timing_ms(latency_breakdown_ms, "bm25") if latency_breakdown_ms else round(float(latency_ms), 4),
+                "Keyword candidate retrieval",
+            )
+        )
+
+    if effective_method in TV_METHODS:
+        trace.append(
+            trace_step(
+                "query_embedding",
+                "BGE query embedding",
+                timing_ms(latency_breakdown_ms, "embed", "embedding", "query_embedding"),
+                "Query text converted to vector",
+            )
+        )
+
+    if effective_method in {"tv_dense", "tv_hybrid", "tv_filtered_hybrid"}:
+        trace.append(
+            trace_step(
+                "dense",
+                "TurboVec dense search",
+                timing_ms(latency_breakdown_ms, "turbovec", "dense"),
+                "Vector candidate retrieval",
+            )
+        )
+
+    if effective_method in {"tv_hybrid", "tv_filtered_hybrid"}:
+        trace.append(
+            trace_step(
+                "fusion",
+                "RRF fusion",
+                timing_ms(latency_breakdown_ms, "fusion", "rrf"),
+                "BM25 and dense rankings fused",
+            )
+        )
+
+    if effective_method == "tv_bridge_title_entities_rrf":
+        trace.extend(
+            [
+                trace_step(
+                    "bridge_first_hop",
+                    "Bridge first-hop retrieval",
+                    timing_ms(latency_breakdown_ms, "hop1", "first_hop"),
+                    "Initial evidence candidates retrieved",
+                ),
+                trace_step(
+                    "bridge_second_hop",
+                    "Bridge second-hop retrieval",
+                    timing_ms(latency_breakdown_ms, "hop2", "second_hop"),
+                    "Follow-up candidates retrieved from title/entity terms",
+                ),
+            ]
+        )
+
+    trace.append(
+        trace_step(
+            "hydration",
+            "Hydrate documents",
+            timing_ms(latency_breakdown_ms, "hydrate", "hydration"),
+            "Loaded title, content, and metadata",
+        )
+    )
+
+    support_summary_text = (
+        f"Found {support_summary['matched_count']}/{support_summary['total_count']} gold support docs"
+        if support_summary["available"]
+        else "Gold support unavailable"
+    )
+    trace.append(trace_step("support_overlay", "Support overlay", None, support_summary_text))
+    return trace
 
 @lru_cache(maxsize=8)
 def get_es_retriever_for_profile(profile_id: str) -> ElasticsearchRetriever:
@@ -731,6 +845,17 @@ def run_profile_search(
     latency_breakdown_ms: dict[str, float] | None = None
     if effective_method in TV_METHODS:
         tv_retriever = get_tv_retriever() if profile.id == "hotpotqa" else get_tv_retriever_for_profile(profile.id)
+        if effective_method == "tv_bridge_title_entities_rrf":
+            hits = tv_retriever.search_bridge_title_entities_rrf(
+                request.query,
+                request.top_k,
+                beam_size=1,
+                max_bridge_terms=6,
+                candidate_k=settings.hybrid_bm25_k,
+                rrf_k=settings.rrf_k,
+            )
+            latency_breakdown_ms = {key: round(float(value), 4) for key, value in tv_retriever.last_timing_ms.items()}
+            return hits, latency_breakdown_ms, round((time.perf_counter() - start) * 1000, 4)
         search_kwargs = {
             "bm25_k": settings.hybrid_bm25_k,
             "dense_k": settings.hybrid_dense_k,
@@ -782,6 +907,7 @@ def build_search_response(
             if field in hit and hit[field] is not None:
                 result[field] = hit[field]
         results.append(result)
+    support_summary = build_support_summary(support_doc_ids, [result["doc_id"] for result in results])
     response = {
         "dataset_id": profile.id,
         "query_id": request.query_id,
@@ -792,7 +918,14 @@ def build_search_response(
         "top_k": request.top_k,
         "latency_ms": latency_ms,
         "cache_hit": False,
-        "support": build_support_summary(support_doc_ids, [result["doc_id"] for result in results]),
+        "support": support_summary,
+        "retrieval_trace": build_retrieval_trace(
+            execution_plan=execution_plan,
+            effective_method=effective_method,
+            latency_ms=latency_ms,
+            latency_breakdown_ms=latency_breakdown_ms,
+            support_summary=support_summary,
+        ),
         "results": results,
     }
     if effective_method != requested_method:
@@ -814,7 +947,8 @@ def dataset_search(dataset_id: str, request: SearchRequest) -> dict[str, Any]:
     execution_plan = build_search_execution_plan(request)
     metadata_filters = execution_plan.metadata_filters
     search_request = request_with_query(request, execution_plan.effective_query)
-    if method not in profile.methods:
+    hidden_hotpotqa_method = profile.id == "hotpotqa" and method in METHODS
+    if method not in profile.methods and not hidden_hotpotqa_method:
         raise HTTPException(status_code=400, detail=f"Unknown method for dataset {profile.id}: {request.method}")
     if metadata_filters and not profile.supports_metadata_filters:
         raise HTTPException(status_code=400, detail=f"Dataset {profile.id} does not support metadata filters")

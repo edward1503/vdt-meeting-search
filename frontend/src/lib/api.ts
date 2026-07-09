@@ -47,6 +47,14 @@ export interface SearchSupportSummary {
   recall_at_k: number | null;
 }
 
+export interface RetrievalTraceStep {
+  step: string;
+  label: string;
+  status: 'completed' | 'running' | 'pending' | 'skipped';
+  elapsed_ms: number | null;
+  summary: string;
+}
+
 export interface SearchResponse {
   dataset_id?: string;
   query_id?: string | null;
@@ -61,6 +69,7 @@ export interface SearchResponse {
   metadata_filters?: SearchFilters;
   metadata_filter_scope?: 'hard_prefilter';
   support?: SearchSupportSummary;
+  retrieval_trace?: RetrievalTraceStep[];
   results: SearchResult[];
 }
 
