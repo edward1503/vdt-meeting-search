@@ -68,7 +68,7 @@ DATASET_PROFILES: tuple[DatasetProfile, ...] = (
         task_type="multi-hop retrieval",
         dataset_id="beir/hotpotqa/dev",
         index="hotpotqa_full_bm25_current",
-        methods=("es_bm25", "tv_dense", "tv_hybrid", "tv_filtered_hybrid"),
+        methods=("tv_hybrid", "tv_bridge_title_entities_rrf"),
         default_method="tv_hybrid",
         dense_backend="turbovec",
         embedding_model="BAAI/bge-small-en-v1.5",
@@ -102,7 +102,7 @@ DATASET_PROFILES: tuple[DatasetProfile, ...] = (
             ROOT_DIR / "evaluation" / "results" / "vimqa" / "dense_bkai_vimqa_full.json",
         ),
         readiness="ready",
-        supports_metadata_filters=False,
+        supports_metadata_filters=True,
         primary_metric="recall@10",
     ),
 )

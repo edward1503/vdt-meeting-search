@@ -1,0 +1,108 @@
+{
+  "config": {
+    "target_k": 10,
+    "candidate_depth": 100,
+    "queries": 5
+  },
+  "methods": {
+    "tv_hybrid": {
+      "queries": 5,
+      "target_k": 10,
+      "candidate_depth": 100,
+      "full_support_at_k": 0.2,
+      "any_support_at_k": 1.0,
+      "candidate_recall_at_depth": 0.6,
+      "mean_first_relevant_rank": 1.2,
+      "failure_buckets": {
+        "candidate_ranked_low": 0,
+        "missing_candidate": 0,
+        "partial_candidate_support": 4,
+        "success": 1
+      }
+    }
+  },
+  "per_query": {
+    "5a72d90d55429901807daf53": {
+      "tv_hybrid": {
+        "bucket": "success",
+        "relevant_doc_ids": [
+          "1439517",
+          "53835801"
+        ],
+        "relevant_in_top_k": [
+          "1439517",
+          "53835801"
+        ],
+        "relevant_in_candidates": [
+          "1439517",
+          "53835801"
+        ],
+        "first_relevant_rank": 1
+      }
+    },
+    "5ab2eed755429929539468c9": {
+      "tv_hybrid": {
+        "bucket": "partial_candidate_support",
+        "relevant_doc_ids": [
+          "2638000",
+          "46920674"
+        ],
+        "relevant_in_top_k": [
+          "46920674"
+        ],
+        "relevant_in_candidates": [
+          "46920674"
+        ],
+        "first_relevant_rank": 2
+      }
+    },
+    "5ac4401b5542997ea680ca4c": {
+      "tv_hybrid": {
+        "bucket": "partial_candidate_support",
+        "relevant_doc_ids": [
+          "32294636",
+          "47775055"
+        ],
+        "relevant_in_top_k": [
+          "47775055"
+        ],
+        "relevant_in_candidates": [
+          "47775055"
+        ],
+        "first_relevant_rank": 1
+      }
+    },
+    "5ae142a4554299422ee9964a": {
+      "tv_hybrid": {
+        "bucket": "partial_candidate_support",
+        "relevant_doc_ids": [
+          "1216600",
+          "27452573"
+        ],
+        "relevant_in_top_k": [
+          "27452573"
+        ],
+        "relevant_in_candidates": [
+          "27452573"
+        ],
+        "first_relevant_rank": 1
+      }
+    },
+    "5ae81fbf55429952e35eaa37": {
+      "tv_hybrid": {
+        "bucket": "partial_candidate_support",
+        "relevant_doc_ids": [
+          "6607768",
+          "87161"
+        ],
+        "relevant_in_top_k": [
+          "6607768"
+        ],
+        "relevant_in_candidates": [
+          "6607768"
+        ],
+        "first_relevant_rank": 1
+      }
+    }
+  }
+}

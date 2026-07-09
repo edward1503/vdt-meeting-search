@@ -139,7 +139,7 @@ def ingest_bm25(args: argparse.Namespace) -> None:
     es = _client(args.url)
     ingested_files = []
     for path in files:
-        docs = ingest_bm25_file(es, args.index, path, args.batch_size)
+        docs = ingest_bm25_file(es, args.index, path, args.batch_size, title_aware=getattr(args, 'title_aware', False))
         done_marker_path(args.progress_dir, path).write_text(
             json.dumps({"file": path.name, "docs": docs}, indent=2), encoding="utf-8"
         )
@@ -167,7 +167,7 @@ def ingest_file(es: Any, model: Any, index: str, path: Path, batch_size: int) ->
     return docs
 
 
-def ingest_bm25_file(es: Any, index: str, path: Path, batch_size: int) -> int:
+def ingest_bm25_file(es: Any, index: str, path: Path, batch_size: int, title_aware: bool = False) -> int:
     from elasticsearch import helpers
 
     batch: list[dict[str, Any]] = []
@@ -178,11 +178,21 @@ def ingest_bm25_file(es: Any, index: str, path: Path, batch_size: int) -> int:
                 continue
             batch.append(json.loads(line))
             if len(batch) >= batch_size:
-                helpers.bulk(es, [bm25_bulk_action(index, row) for row in batch], chunk_size=len(batch), request_timeout=120)
+                helpers.bulk(
+                    es,
+                    [bm25_bulk_action(index, row, title_aware=title_aware) for row in batch],
+                    chunk_size=len(batch),
+                    request_timeout=120,
+                )
                 docs += len(batch)
                 batch.clear()
     if batch:
-        helpers.bulk(es, [bm25_bulk_action(index, row) for row in batch], chunk_size=len(batch), request_timeout=120)
+        helpers.bulk(
+            es,
+            [bm25_bulk_action(index, row, title_aware=title_aware) for row in batch],
+            chunk_size=len(batch),
+            request_timeout=120,
+        )
         docs += len(batch)
     return docs
 
@@ -257,7 +267,11 @@ def create_bm25_index(args: argparse.Namespace) -> None:
     if not es.indices.exists(index=args.index):
         es.indices.create(
             index=args.index,
-            body=build_bm25_index_body(shards=args.shards, include_metadata=getattr(args, 'metadata', False)),
+            body=build_bm25_index_body(
+                shards=args.shards,
+                include_metadata=getattr(args, 'metadata', False),
+                title_aware=getattr(args, 'title_aware', False),
+            ),
         )
     es.indices.put_alias(index=args.index, name=args.alias)
     print(json.dumps({'index': args.index, 'alias': args.alias, 'created': True, 'mode': 'bm25'}, indent=2))
@@ -311,6 +325,7 @@ def main() -> None:
     create_bm25_parser.add_argument('--shards', type=int, default=1)
     create_bm25_parser.add_argument('--reset', action='store_true')
     create_bm25_parser.add_argument('--metadata', action='store_true')
+    create_bm25_parser.add_argument('--title-aware', action='store_true')
 
     ingest_parser = subparsers.add_parser('ingest')
     ingest_parser.add_argument('--index', default='hotpotqa_docs_v1')
@@ -326,6 +341,7 @@ def main() -> None:
     ingest_bm25_parser.add_argument('--progress-dir', type=Path, default=Path('artifacts/hotpotqa_full/progress/bm25'))
     ingest_bm25_parser.add_argument('--batch-size', type=int, default=1000)
     ingest_bm25_parser.add_argument('--max-files', type=int, default=None)
+    ingest_bm25_parser.add_argument('--title-aware', action='store_true')
 
     validate_parser = subparsers.add_parser('validate')
     validate_parser.add_argument('--index', default='hotpotqa_docs_current')
@@ -335,7 +351,7 @@ def main() -> None:
     search_parser.add_argument('--index', default='hotpotqa_docs_current')
     search_parser.add_argument(
         '--method',
-        choices=['bm25', 'dense', 'hybrid', 'iterative_hybrid', 'iterative_title', 'iterative_sentence', 'iterative_fast'],
+        choices=['bm25', 'bm25_title', 'dense', 'hybrid', 'iterative_hybrid', 'iterative_title', 'iterative_sentence', 'iterative_fast'],
         default='bm25',
     )
     search_parser.add_argument('--query', required=True)

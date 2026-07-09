@@ -1,0 +1,951 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+\setmainlanguage{vietnamese}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+\setmonofont{Consolas}
+
+\definecolor{vdtnavy}{HTML}{1F3A5F}
+\definecolor{vdtteal}{HTML}{1F7A7A}
+\definecolor{vdtgray}{HTML}{F3F5F7}
+\definecolor{vdtline}{HTML}{D6DEE6}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=vdtnavy,
+  urlcolor=vdtteal,
+  citecolor=vdtnavy
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\sffamily Không gian truy xuất bằng chứng}
+\rhead{\sffamily \thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+\setlength{\emergencystretch}{3em}
+
+\titleformat{\section}
+  {\Large\sffamily\bfseries\color{vdtnavy}}
+  {\thesection}{0.7em}{}
+\titleformat{\subsection}
+  {\large\sffamily\bfseries\color{vdtnavy}}
+  {\thesubsection}{0.7em}{}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.25em,topsep=0.3em}
+\setlist[enumerate]{leftmargin=1.6em,itemsep=0.25em,topsep=0.3em}
+\renewcommand{\arraystretch}{1.2}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+
+\newcommand{\method}[1]{\texttt{#1}}
+\newcommand{\metric}[1]{\texttt{#1}}
+\newcommand{\claim}[1]{\textbf{\color{vdtnavy}#1}}
+\newcommand{\bridgecell}{\texttt{tv\_bridge\_title\_}\\\texttt{entities\_rrf}}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{1.0cm}
+  {\Huge\sffamily\bfseries Không gian truy xuất bằng chứng\par}
+  \vspace{0.4cm}
+  {\Large\sffamily cho QA đa bước và tìm kiếm siêu dữ liệu ngữ nghĩa\par}
+  \vspace{1.2cm}
+  {\large Báo cáo kỹ thuật nháp cho mentor\par}
+  \vspace{0.4cm}
+  {\large Cập nhật: 30/06/2026\par}
+  \vfill
+  \begin{tabularx}{0.86\textwidth}{>{\bfseries\sffamily}l Y}
+    Luận điểm &
+    Hệ thống tập trung vào tầng truy xuất: tìm đúng bằng chứng, mở rộng lên toàn bộ corpus,
+    đánh giá bằng metric phù hợp cho QA đa bước, và làm kết quả truy xuất có thể giải thích được. \\
+    Phạm vi &
+    Không trình bày như nhật ký sprint. Báo cáo đi theo bài toán, kiến trúc, phương pháp,
+    đánh giá, tìm kiếm siêu dữ liệu ngữ nghĩa, giới hạn và bước tiếp theo. \\
+  \end{tabularx}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Tóm tắt}
+
+Dự án xây dựng một không gian truy xuất bằng chứng cho bài toán hỏi đáp đa bước
+và tìm kiếm siêu dữ liệu ngữ nghĩa. Trọng tâm của hệ thống không phải sinh câu trả lời cuối cùng,
+mà là trả về các tài liệu/ngữ cảnh có thể dùng làm bằng chứng cho bước suy luận phía sau.
+
+Ba điểm chính cần mentor nắm:
+
+\begin{itemize}
+  \item \claim{Mở rộng toàn bộ tập dữ liệu:} hệ thống chạy trên toàn bộ tập HotpotQA với
+  5,233,329 tài liệu, dùng Elasticsearch cho BM25/kho tài liệu và TurboVec cho truy xuất dense nén.
+  \item \claim{Đánh giá đúng bài toán đa bước:} metric quan trọng nhất là
+  \metric{full\_support\_recall@10}, vì một truy vấn HotpotQA có thể cần đủ nhiều tài liệu hỗ trợ.
+  \item \claim{Tìm kiếm siêu dữ liệu ngữ nghĩa có thể giải thích:} truy vấn tự nhiên có thể được tách thành
+  \texttt{effective\_query} và \texttt{metadata\_filters}, nhưng bộ phân tích chỉ chạy khi được bật thủ công để không làm nhiễu truy vấn gốc.
+\end{itemize}
+
+Kết quả mới nhất đáng nhấn mạnh là hướng \method{tv\_bridge\_title\_entities\_rrf}.
+Trong pilot 200 truy vấn, phương pháp này nâng \metric{full\_support@10} từ 0.545 của
+\method{tv\_hybrid} lên 0.620. Cấu hình tuning \texttt{beam1\_terms6} giữ nguyên
+0.620 và giảm độ trễ p95 xuống khoảng 1225 ms.
+
+\section{Định nghĩa bài toán}
+
+Bài toán được định nghĩa là \textbf{truy xuất bằng chứng}, không phải sinh câu trả lời.
+Với mỗi câu hỏi hoặc truy vấn tự nhiên, hệ thống trả về top-k tài liệu có khả năng làm
+bằng chứng. Với HotpotQA, một câu hỏi thường cần nhiều tài liệu hỗ trợ. Nếu hệ thống chỉ
+tìm được một tài liệu hỗ trợ nhưng thiếu tài liệu còn lại, bước suy luận phía sau vẫn có thể thất bại.
+
+Vì vậy, ngoài recall@k, hệ thống dùng \metric{full\_support\_recall@k}. Metric này đo tỷ lệ
+truy vấn mà top-k kết quả chứa đủ toàn bộ tài liệu hỗ trợ.
+
+\begin{quote}
+Trong truy xuất đa bước, câu hỏi không chỉ là top-k có tài liệu liên quan hay không,
+mà là top-k có đủ bộ tài liệu hỗ trợ hay không.
+\end{quote}
+
+\section{Kiến trúc: tách luồng xử lý offline và luồng truy vấn online}
+
+Kiến trúc nên được trình bày bằng hai luồng riêng. Cách tách này làm rõ phần nào chạy
+trước để xây artifact, phần nào chạy tại thời điểm truy vấn để phục vụ người dùng.
+
+\subsection{Luồng ingest/xử lý offline}
+
+Luồng ingest/xử lý chạy trước thời gian chạy. Mục tiêu là biến corpus thô thành các artifact ổn định
+có thể tìm kiếm được.
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\ttfamily
+Tập dữ liệu gốc\\
+-> chuẩn hóa tài liệu\\
+-> gán numeric\_id ổn định\\
+-> sinh siêu dữ liệu tổng hợp\\
+-> chia shard JSONL staging\\
+-> xây index BM25 trên Elasticsearch\\
+-> sinh shard embedding\\
+-> xây index dense TurboVec 4-bit\\
+-> kiểm tra số lượng tài liệu và artifact
+\end{minipage}
+}
+\end{center}
+
+Các artifact chính:
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.28\textwidth} Y}
+\toprule
+Artifact & Vai trò \\
+\midrule
+Shard JSONL staging & Chuẩn hóa corpus, chia shard, giữ \texttt{numeric\_id} ổn định. \\
+Index Elasticsearch & Truy xuất lexical bằng BM25, lọc siêu dữ liệu, hydrate tài liệu. \\
+Shard embedding & Vector hóa nội dung bằng BGE-small hoặc model theo từng dataset. \\
+TurboVec \texttt{.tvim} & Truy xuất dense nén 4-bit cho toàn bộ corpus. \\
+Artifact siêu dữ liệu & Siêu dữ liệu tổng hợp để demo truy xuất có nhận biết metadata. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Luồng retrieval online}
+
+Luồng retrieval chạy khi người dùng nhập truy vấn. Luồng này không xử lý lại corpus, mà dùng
+các index đã xây sẵn.
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\ttfamily
+Truy vấn người dùng\\
+-> bộ phân tích siêu dữ liệu ngữ nghĩa tùy chọn\\
+-> effective\_query + metadata\_filters\\
+-> truy xuất BM25 từ Elasticsearch\\
+-> truy xuất dense từ TurboVec\\
+-> hydrate kết quả dense qua Elasticsearch numeric\_id\\
+-> gộp hạng bằng RRF hoặc bridge-aware\\
+-> overlay support + highlight + chip đã parse\\
+-> kết quả trên dashboard React
+\end{minipage}
+}
+\end{center}
+
+Điểm thiết kế quan trọng là Elasticsearch và TurboVec không thay thế nhau. Elasticsearch giữ
+vai trò truy xuất lexical, lọc và kho tài liệu. TurboVec giữ vai trò truy xuất dense
+nén ở quy mô toàn bộ corpus. Hai backend được nối bằng \texttt{numeric\_id}; tầng ứng dụng
+hydrate kết quả dense và gộp hạng bằng RRF hoặc chiến lược bridge-aware.
+
+\section{Các phương pháp retrieval}
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.30\textwidth} Y}
+\toprule
+Phương pháp & Vai trò \\
+\midrule
+es\_bm25 & Mốc so sánh lexical nhanh, mạnh khi truy vấn có độ trùng entity. \\
+tv\_dense & Truy xuất ngữ nghĩa bằng TurboVec, hữu ích khi truy vấn ít trùng từ khóa. \\
+tv\_hybrid & BM25 + ứng viên dense, gộp hạng bằng Reciprocal Rank Fusion. \\
+tv\_filtered\_hybrid & BM25 prefilter + truy xuất dense bị ràng buộc bởi metadata/filter. \\
+\bridgecell & Truy xuất bridge-aware cho tài liệu hỗ trợ thứ hai trong QA đa bước. \\
+\bottomrule
+\end{tabularx}
+
+Kết quả pilot 200 truy vấn dev trên toàn bộ HotpotQA corpus:
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.30\textwidth} r r Y}
+\toprule
+Phương pháp & Full-support@10 & Độ trễ p95 & Diễn giải \\
+\midrule
+es\_bm25 & 0.365 & 359.63 ms & Mốc so sánh lexical nhanh, nhưng thiếu nhiều bộ support đầy đủ. \\
+tv\_dense & 0.515 & 868.00 ms & Đường dense cải thiện rõ trên toàn bộ corpus. \\
+tv\_hybrid & 0.545 & 2061--3089 ms & Mốc so sánh hybrid ưu tiên chất lượng, tùy lần chạy/cấu hình. \\
+\bridgecell & 0.620 & 1224.99 ms & Kết quả pilot tốt nhất sau tuning \texttt{beam1\_terms6}. \\
+\bottomrule
+\end{tabularx}
+
+Kết luận kỹ thuật: không có phương pháp thắng tuyệt đối trong mọi hoàn cảnh. BM25 tốt về độ trễ,
+dense tốt cho độ bền ngữ nghĩa, hybrid cân bằng lexical/dense, còn truy xuất bridge-aware
+đánh trực tiếp vào lỗi thiếu tài liệu hỗ trợ trong truy xuất đa bước.
+
+\section{Các thí nghiệm ablation}
+
+Các thí nghiệm ablation trong dự án không chỉ so sánh phương pháp nào cao điểm hơn. Mục tiêu chính
+là xác định phần tăng chất lượng đến từ đâu: index lexical, truy xuất dense, gộp hạng RRF, reranking,
+sinh ứng viên bridge-aware, hay độ bền trước paraphrase.
+
+\subsection{Thí nghiệm index: BM25 có title-aware}
+
+BM25 có nhận biết title tăng trọng số các trường gần với title/entity như \texttt{title\_exact},
+\texttt{lead\_sentence} và \texttt{title\_repeat\_content}. Kết quả cho thấy các metric lexical
+tăng nhẹ, nhưng metric chính của HotpotQA không đổi.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.24\textwidth} r r r r}
+\toprule
+Phương pháp & Recall@10 & MRR@10 & nDCG@10 & Full-support@10 \\
+\midrule
+es\_bm25 & 0.6025 & 0.7108 & 0.5727 & 0.3650 \\
+es\_bm25\_title & 0.6050 & 0.7159 & 0.5786 & 0.3650 \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: index có nhận biết title là ablation sạch và rẻ, nhưng không giải quyết lỗi
+chính của HotpotQA là thiếu tài liệu hỗ trợ thứ hai. Vì vậy phương pháp này được giữ làm
+benchmark ablation, không làm mặc định.
+
+\subsection{Thí nghiệm gộp hạng: RRF so với cross-encoder reranker}
+
+Thí nghiệm reranker dùng \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2} với ngân sách 100 ứng viên.
+Kết quả cho thấy reranker cải thiện một số rank-sensitive metrics, nhưng không cải thiện
+\metric{full\_support@10}.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.26\textwidth} r r r r r}
+\toprule
+Phương pháp & Full-support@10 & Recall@10 & MRR@10 & nDCG@10 & Độ trễ p95 \\
+\midrule
+tv\_hybrid & 0.5450 & 0.7500 & 0.8691 & 0.7291 & 2061.4370 ms \\
+tv\_hybrid\_rerank & 0.5450 & 0.7550 & 0.9268 & 0.7464 & 1304.2816 ms \\
+\bottomrule
+\end{tabularx}
+
+Dịch chuyển theo cặp trên 200 truy vấn:
+
+\begin{itemize}
+  \item Chỉ RRF thành công: 14.
+  \item Chỉ reranker thành công: 14.
+  \item Cả hai cùng thành công: 95.
+  \item Cả hai cùng thất bại: 77.
+  \item Net win của reranker: 0.
+\end{itemize}
+
+Diễn giải: chưa có bằng chứng đủ mạnh để nói reranker là hướng chính. Nếu full-support không
+tăng, vấn đề không chỉ nằm ở việc sắp xếp lại ứng viên. Cần cải thiện bước sinh ứng viên cho
+tài liệu hỗ trợ bị thiếu.
+
+\subsection{Thí nghiệm sinh ứng viên: truy xuất bridge-aware}
+
+Truy xuất bridge-aware được thiết kế để đánh vào lỗi lớn nhất: truy vấn tìm được một tài liệu hỗ trợ
+nhưng thiếu tài liệu hỗ trợ còn lại. So với \method{tv\_hybrid} chạy một lượt, phương pháp bridge-aware tạo
+truy vấn bước hai từ tín hiệu title/entity/lead-sentence của các ứng viên bước đầu.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.30\textwidth} r r r r}
+\toprule
+Phương pháp & Full-support@10 & Recall@10 & nDCG@10 & Độ trễ p95 \\
+\midrule
+tv\_hybrid & 0.5450 & 0.7500 & 0.7291 & 1146.5764 ms \\
+tv\_two\_hop\_bridge\_rrf & 0.5600 & 0.7450 & 0.6999 & 2773.5883 ms \\
+\bridgecell & 0.6200 & 0.7850 & 0.7398 & 2670.3591 ms \\
+\bottomrule
+\end{tabularx}
+
+Chẩn đoán cho thấy phương pháp bridge title/entities chuyển thêm 15/200 truy vấn thành full-support
+thành công và giảm lỗi partial-support từ 82 xuống 66. Đây là ablation đầu tiên tạo mức tăng rõ ràng
+trên metric chính.
+
+\subsection{Thí nghiệm siêu tham số: tinh chỉnh truy xuất bridge-aware}
+
+Sau khi truy xuất bridge-aware tạo mức tăng, lưới tinh chỉnh kiểm tra liệu beam rộng có thật sự cần thiết
+không. Kết quả tốt nhất cho điểm vận hành hiện tại là \texttt{beam1\_terms6}.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.24\textwidth} r r r r r}
+\toprule
+Cấu hình & Beam & Số terms & Full-support@10 & nDCG@10 & Độ trễ p95 \\
+\midrule
+beam1\_terms6 & 1 & 6 & 0.6200 & 0.7382 & 1224.9911 ms \\
+beam2\_terms4 & 2 & 4 & 0.6100 & 0.7430 & 1758.8852 ms \\
+beam2\_terms6 & 2 & 6 & 0.6200 & 0.7423 & 2593.4644 ms \\
+beam2\_terms8 & 2 & 8 & 0.6200 & 0.7399 & 1827.7998 ms \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: beam rộng hơn không tăng full-support trong pilot này. \texttt{beam1\_terms6}
+giữ 0.6200 full-support và giảm mạnh độ trễ p95, nên là cấu hình tiếp theo cần được đánh giá lớn hơn.
+
+\subsection{Thí nghiệm độ bền truy vấn: paraphrase}
+
+Benchmark paraphrase gây áp lực lên truy xuất bằng cách đổi truy vấn ở ba mức: mild, strong và lexical-strong.
+Mild/strong chủ yếu kiểm tra đảo trật tự câu, còn lexical-strong mới thật sự thay từ nội dung để gây áp lực lên
+truy xuất lexical.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.26\textwidth} r r r r}
+\toprule
+Phương pháp & Gốc & Mild & Strong & Lexical strong \\
+\midrule
+es\_bm25 & 0.365 & 0.365 & 0.375 & 0.340 \\
+tv\_dense & 0.515 & 0.515 & 0.515 & 0.495 \\
+tv\_hybrid & 0.535 & 0.515 & 0.515 & 0.480 \\
+tv\_filtered\_hybrid & 0.430 & 0.435 & 0.440 & 0.395 \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: \method{tv\_dense} ổn định nhất khi độ trùng lexical bị phá
+($-0.020$ full-support), còn \method{tv\_hybrid} tốt trên truy vấn gốc nhưng giảm mạnh hơn ở
+lexical-strong ($-0.055$). Đây là lý do đường dense vẫn cần thiết, dù BM25/hybrid có thể tốt hơn
+ở truy vấn gốc.
+
+\subsection{Thí nghiệm họ retrieval: BM25 so với dense và hybrid}
+
+Đây là ablation nền tảng nhất của HotpotQA toàn corpus: chỉ lexical, chỉ dense,
+hybrid RRF, và filtered hybrid. Nó trả lời câu hỏi ``có cần đường dense không, và gộp hạng
+có đáng giá không?''.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.26\textwidth} r r r r}
+\toprule
+Phương pháp & Recall@10 & MRR@10 & nDCG@10 & Full-support@10 \\
+\midrule
+es\_bm25 & 0.6025 & 0.7108 & 0.5727 & 0.3650 \\
+tv\_dense & 0.7225 & 0.8472 & 0.7082 & 0.5150 \\
+tv\_hybrid & 0.7500 & 0.8681 & 0.7286 & 0.5450 \\
+tv\_filtered\_hybrid & 0.6800 & 0.8225 & 0.6735 & 0.4550 \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: truy xuất dense bằng TurboVec tạo mức tăng lớn so với BM25 trên toàn bộ corpus
+($0.3650 \rightarrow 0.5150$ full-support). Hybrid RRF tiếp tục cải thiện lên 0.5450,
+nên dense và gộp hạng đều có bằng chứng. Filtered hybrid thấp hơn vì BM25 prefilter có thể loại
+mất tài liệu hỗ trợ thứ hai.
+
+\subsection{Thí nghiệm filtered hybrid: hybrid rộng so với hybrid có ràng buộc metadata}
+
+\method{tv\_filtered\_hybrid} là thí nghiệm ablation giữa hybrid rộng ưu tiên chất lượng và đường có ràng buộc cứng
+từ allowlist BM25/filter. Đây là phương pháp quan trọng cho tìm kiếm metadata, nhưng không
+nên đọc như phương pháp chất lượng mặc định của HotpotQA.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.30\textwidth} r r r r}
+\toprule
+Phương pháp & Full-support@10 & Recall@10 & nDCG@10 & Độ trễ p95 \\
+\midrule
+tv\_hybrid & 0.5450 & 0.7500 & 0.7286 & 3089.2229 ms \\
+tv\_filtered\_hybrid & 0.4550 & 0.6800 & 0.6735 & 1953.6118 ms \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: filtered hybrid giảm độ trễ so với hybrid rộng, nhưng mất 0.090 điểm tuyệt đối
+full-support. Đánh đổi này hợp lý cho ràng buộc metadata, không hợp lý để thay mặc định
+HotpotQA khi mục tiêu là phủ bằng chứng tối đa.
+
+\subsection{Thí nghiệm cross-dataset: VimQA BM25 so với dense và hybrid}
+
+VimQA kiểm tra giả định ``dense/hybrid luôn thắng BM25'' trên proxy truy xuất tiếng Việt.
+Dataset này có 3,623 tài liệu và 9,044 truy vấn/qrels.
+
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.18\textwidth} r r r r Y}
+\toprule
+Phương pháp & Recall@10 & MRR@10 & nDCG@10 & Độ trễ p95 & Quyết định \\
+\midrule
+es\_bm25 & 0.9627 & 0.8606 & 0.8859 & 84.4191 ms & Mặc định tốt nhất. \\
+es\_dense & 0.8716 & 0.7272 & 0.7625 & 115.0396 ms & Dense không thắng BM25. \\
+es\_hybrid & 0.9644 & 0.8277 & 0.8609 & 206.3031 ms & Recall nhỉnh hơn nhưng xếp hạng/độ trễ kém hơn. \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+Diễn giải: đặc tính dataset quyết định phương pháp. Trên VimQA, độ trùng lexical cao và mỗi truy vấn
+có một gold context, nên BM25 là phương án tốt nhất khi xét cả xếp hạng. Đây là phản ví dụ quan trọng chống
+lại việc nói quá về dense/hybrid.
+
+\subsection{Thí nghiệm metadata filter: thu hẹp không gian ứng viên}
+
+Ablation metadata dùng metadata HotpotQA tổng hợp để đo filter làm hẹp không gian ứng viên thế nào.
+Đây không phải benchmark chất lượng BEIR, mà là bằng chứng về hành vi sản phẩm/tìm kiếm.
+
+\small
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{0.24\textwidth} Y r r}
+\toprule
+Kịch bản & Bộ lọc & Số tài liệu khớp & Mức thu hẹp \\
+\midrule
+Chỉ nội dung & không có & 5,233,329 & 0.0000\% \\
+Lọc tác giả & author=Nguyen An & 40,886 & 99.2187\% \\
+Lọc ngày tạo & created\_at trong tháng 01/2024 & 222,239 & 95.7534\% \\
+Lọc ngày sửa & modified\_at 10--20/01 & 60,589 & 98.8422\% \\
+Tác giả + ngày tạo & author + created\_at & 1,793 & 99.9657\% \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+Diễn giải: metadata có cấu trúc giúp corpus 5.23M tài liệu dễ kiểm tra hơn.
+Kịch bản tác giả + ngày tạo thu hẹp không gian ứng viên 99.9657\% trước bước xếp hạng theo nội dung.
+Khẳng định an toàn: lọc metadata hoạt động như một cơ chế demo/tìm kiếm có kiểm soát. Không khẳng định:
+metadata tổng hợp là tác giả thật của HotpotQA hoặc metadata meeting production.
+
+\subsection{Thí nghiệm chiến lược tài liệu: mức tài liệu so với mức đoạn}
+
+EDA về chiến lược tài liệu kiểm tra liệu chia đoạn rộng có nên là bước nâng chất lượng tiếp theo
+ở tầng ingest hay không. Kết quả không ủng hộ việc chọn chia đoạn rộng làm bước đầu tiên.
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.22\textwidth} r r r r}
+\toprule
+Chỉ số & p50 & p90 & p95 & p99 \\
+\midrule
+Số token nội dung & 39 & 90 & 111 & 160 \\
+Số câu/tài liệu & 2 & 5 & 6 & 8 \\
+\bottomrule
+\end{tabularx}
+
+\vspace{0.5em}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.32\textwidth} r r}
+\toprule
+Chiến lược đoạn & Số đơn vị truy xuất ước tính & Tăng so với mức tài liệu \\
+\midrule
+80 tokens, stride 40 & 6,217,195 & +18.8\% \\
+120 tokens, stride 60 & 5,458,362 & +4.3\% \\
+160 tokens, stride 80 & 5,290,896 & +1.1\% \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: tài liệu HotpotQA vốn đã ngắn, nên index đoạn toàn diện phần lớn tái tạo lại
+index ở mức tài liệu nhưng thêm độ phức tạp gom parent. Hướng tốt hơn trước mắt là title/entity
+và truy xuất bridge-aware, không phải chia passage rộng.
+
+\subsection{Thí nghiệm backend dense: Elasticsearch dense so với TurboVec và chỉ BM25}
+
+Sprint 3 cũng có ablation về kiến trúc, không chỉ là bảng metric. Các phương án được cân nhắc:
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.30\textwidth} Y}
+\toprule
+Phương án & Quyết định \\
+\midrule
+Elasticsearch dense\_vector toàn corpus & Loại cho quy mô local 5.23M tài liệu vì overhead RAM/HNSW quá rủi ro. \\
+Truy xuất toàn quy mô chỉ bằng BM25 & Loại làm mục tiêu cuối vì so sánh dense/hybrid là mục tiêu lõi. \\
+Lượng tử hóa TurboVec 2-bit trước & Loại ở bước đầu; BGE-small 384 dim với lượng tử hóa 4-bit là mốc so sánh an toàn hơn. \\
+TurboVec 4-bit + ES BM25/kho tài liệu & Chọn: index dense độc lập, nén, và join ngược về ES bằng \texttt{numeric\_id}. \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: ablation này giải thích vì sao hệ thống có hai backend truy xuất. TurboVec không thay
+Elasticsearch; nó thay đường dense vector toàn corpus, còn Elasticsearch vẫn giữ BM25,
+lọc và kho hydrate tài liệu.
+
+\subsection{Thí nghiệm quy mô cũ: nano/100k và truy xuất lặp Elasticsearch}
+
+Các thí nghiệm sớm từng so sánh Elasticsearch dense/hybrid và truy xuất lặp ở quy mô nano/100k.
+Chúng hữu ích như lịch sử thử nghiệm, nhưng không nên dùng làm khẳng định chính vì thời gian chạy hiện tại
+đã chuyển sang BM25 + TurboVec trên toàn bộ corpus.
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.30\textwidth} Y}
+\toprule
+Thí nghiệm cũ & Cách trình bày \\
+\midrule
+Nano/100k BM25 so với ES dense/hybrid & Bằng chứng khả thi ban đầu, đã được thay bằng artifact toàn corpus 5.23M tài liệu. \\
+ES iterative hybrid/title/sentence/fast & Loại khỏi đường đang chạy trên toàn corpus vì phụ thuộc các trường ES dense cũ. \\
+Paraphrase sớm syn020/syn040/syn060 & Đã được thay bằng benchmark 200 truy vấn mild/strong/lexical-strong có validation. \\
+\bottomrule
+\end{tabularx}
+
+Diễn giải: chỉ nhắc các thí nghiệm này nếu mentor hỏi lịch sử dự án. Với khẳng định chính, dùng các
+ablation toàn corpus và các ablation Sprint 4/5 đã được validate ở trên.
+
+\section{Độ trễ và đánh đổi thời gian chạy}
+
+Độ trễ trong báo cáo này là số đo cục bộ trên laptop Windows khoảng 16 GB RAM, không phải
+SLA cho môi trường thật. Vai trò của các số độ trễ là giúp giải thích đánh đổi giữa chất lượng,
+chiến lược truy xuất và độ phức tạp thời gian chạy.
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.30\textwidth} Y r Y}
+\toprule
+Đường chạy & Vai trò chất lượng & Độ trễ p95 & Đánh đổi \\
+\midrule
+es\_bm25 & Mốc so sánh lexical nhanh & 359.6319 ms & Nhanh nhất, nhưng full-support thấp. \\
+tv\_dense & Truy xuất ngữ nghĩa & 868.0033 ms & Cải thiện full-support, thêm chi phí embedding/tìm kiếm vector. \\
+tv\_hybrid & Mốc so sánh chất lượng rộng & 2061--3089 ms & Gộp BM25+dense tốt hơn, nhưng tốn hydrate/gộp hạng và đường dense. \\
+tv\_filtered\_hybrid & Đường metadata/bộ lọc & 1953.6118 ms & Nhanh hơn hybrid rộng trong pilot, nhưng mất recall/full-support. \\
+\bridgecell, beam1\_terms6 & Pilot HotpotQA tốt nhất & 1224.9911 ms & Giữ full-support 0.6200 sau tuning, nhưng phương pháp phức tạp và chưa đưa làm mặc định. \\
+VimQA es\_bm25 & Mặc định tiếng Việt & 84.4191 ms & Đặc tính dataset có độ trùng lexical cao, nên BM25 vừa nhanh vừa xếp hạng tốt. \\
+\bottomrule
+\end{tabularx}
+
+Phân rã độ trễ theo kiến trúc:
+
+\begin{itemize}
+  \item \textbf{Đường BM25} chủ yếu tốn truy vấn lexical trên Elasticsearch và lấy tài liệu.
+  \item \textbf{Đường dense} thêm embedding cho truy vấn, tìm kiếm vector bằng TurboVec, rồi hydrate bằng Elasticsearch qua \texttt{numeric\_id}.
+  \item \textbf{Đường hybrid} chạy cả BM25 và ứng viên dense, sau đó gộp hạng bằng RRF.
+  \item \textbf{Đường filtered hybrid} dùng allowlist BM25/bộ lọc để giảm không gian tìm kiếm, nhưng nếu allowlist thiếu tài liệu hỗ trợ thì full-support giảm.
+  \item \textbf{Truy xuất bridge-aware} thêm truy xuất bước hai để tìm tài liệu hỗ trợ bị thiếu; tuning giảm beam/terms để giữ gain nhưng hạ p95.
+\end{itemize}
+
+Kết luận thời gian chạy: BM25 là đường dự phòng/demo khi cần phản hồi nhanh; \method{tv\_hybrid} là
+mốc so sánh chất lượng đơn giản; \method{tv\_bridge\_title\_entities\_rrf} là ứng viên tốt nhất
+cho chất lượng HotpotQA sau tuning, nhưng cần benchmark lớn hơn trước khi làm mặc định. Khi trình bày,
+không nên khẳng định độ trễ môi trường thật cho bất kỳ phương pháp nào.
+
+\section{Đánh giá đa bước và chẩn đoán lỗi}
+
+HotpotQA cần đánh giá bằng metric phản ánh đủ bộ bằng chứng. Hệ thống dùng:
+
+\begin{itemize}
+  \item \metric{recall@10}: top-10 có tài liệu liên quan hay không.
+  \item \metric{mrr@10}: tài liệu liên quan đầu tiên đứng cao tới đâu.
+  \item \metric{ndcg@10}: chất lượng xếp hạng theo độ liên quan.
+  \item \metric{full\_support\_recall@10}: top-10 có đủ toàn bộ tài liệu hỗ trợ hay không.
+\end{itemize}
+
+Chẩn đoán xếp hạng chia lỗi thành các nhóm:
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.28\textwidth} Y}
+\toprule
+Nhóm lỗi & Ý nghĩa \\
+\midrule
+Thiếu ứng viên & Tài liệu hỗ trợ không vào tập ứng viên. Reranker không thể cứu case này. \\
+Chỉ có một phần support & Có một phần support nhưng chưa đủ toàn bộ bộ bằng chứng. \\
+Ứng viên xếp thấp & Tài liệu hỗ trợ có trong ứng viên nhưng bị xếp dưới top-k. Đây là nhóm reranker có thể giúp. \\
+Thành công & Đủ tài liệu hỗ trợ trong top-k. \\
+\bottomrule
+\end{tabularx}
+
+Ablation reranker top-100 cho thấy \method{tv\_hybrid\_rerank} không tạo thắng lợi ròng so với RRF
+trên pilot 200 truy vấn: cả hai đều đạt \metric{full\_support@10}=0.545, với 14 truy vấn chỉ RRF
+thành công và 14 truy vấn chỉ reranker thành công. Vì vậy hướng cải thiện hợp lý hơn hiện tại là
+sinh ứng viên/truy xuất tài liệu hỗ trợ thứ hai, dẫn tới \method{tv\_bridge\_title\_entities\_rrf}.
+
+\section{Độ bền truy vấn và thí nghiệm cross-dataset}
+
+\subsection{Độ bền với paraphrase}
+
+Benchmark paraphrase kiểm tra khi độ trùng lexical bị thay đổi. Kết quả profile lexical-strong:
+
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.28\textwidth} r r r}
+\toprule
+Phương pháp & Full-support@10 gốc & Full-support@10 lexical-strong & Chênh lệch \\
+\midrule
+es\_bm25 & 0.365 & 0.340 & -0.025 \\
+tv\_dense & 0.515 & 0.495 & -0.020 \\
+tv\_hybrid & 0.535 & 0.480 & -0.055 \\
+tv\_filtered\_hybrid & 0.430 & 0.395 & -0.035 \\
+\bottomrule
+\end{tabularx}
+
+Điểm rút ra: truy xuất dense ổn định hơn khi độ trùng lexical bị phá. Hybrid vẫn tốt trên truy vấn
+gốc, nhưng còn khoảng cách về độ bền cần tiếp tục cải thiện bằng gộp hạng, truy xuất bridge-aware hoặc benchmark
+sâu hơn.
+
+\subsection{VimQA Tiếng Việt}
+
+VimQA được dùng như proxy truy xuất tiếng Việt:
+
+\begin{itemize}
+  \item question -> truy vấn
+  \item unique context -> tài liệu
+  \item question-context mapping -> qrel
+  \item answer -> metadata tham khảo, không phải mục tiêu truy xuất
+\end{itemize}
+
+Đặc tính dataset:
+
+\begin{tabular}{lr}
+\toprule
+Thành phần & Số lượng \\
+\midrule
+Tài liệu & 3,623 \\
+Truy vấn & 9,044 \\
+Qrels & 9,044 \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.5em}
+
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.18\textwidth} r r r r Y}
+\toprule
+Phương pháp & Recall@10 & MRR@10 & nDCG@10 & Độ trễ p95 & Kết luận \\
+\midrule
+es\_bm25 & 0.9627 & 0.8606 & 0.8859 & 84.42 ms & Mặc định tốt nhất. \\
+es\_dense & 0.8716 & 0.7272 & 0.7625 & 115.04 ms & Dense không thắng BM25. \\
+es\_hybrid & 0.9644 & 0.8277 & 0.8609 & 206.30 ms & Recall nhỉnh hơn, xếp hạng/độ trễ kém BM25. \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+Kết luận: không thể giả định dense hoặc hybrid luôn thắng BM25. Phương pháp tốt nhất phụ thuộc đặc tính của dataset.
+
+\section{Tìm kiếm metadata ngữ nghĩa}
+
+Tìm kiếm metadata ngữ nghĩa trả lời feedback rằng người dùng không nên phải nhập truy vấn nội dung và form bộ lọc
+riêng biệt. Hệ thống cho phép một truy vấn tự nhiên chứa cả ý định nội dung và ràng buộc metadata.
+
+Ví dụ truy vấn tiếng Việt:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\ttfamily
+tài liệu về lịch sử Việt Nam của Nguyen An trước 31/01/2024
+\end{minipage}
+}
+\end{center}
+
+Bộ phân tích tách thành:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\ttfamily
+original\_query = tài liệu về lịch sử Việt Nam của Nguyen An trước 31/01/2024\\
+effective\_query = lịch sử Việt Nam\\
+metadata\_filters.author = Nguyen An\\
+metadata\_filters.created\_at\_to = 2024-01-31
+\end{minipage}
+}
+\end{center}
+
+Thiết kế quan trọng:
+
+\begin{itemize}
+  \item Bộ phân tích chỉ chạy khi \texttt{semantic\_metadata=true}.
+  \item Bộ phân tích rule-based được dùng trước để dễ kiểm soát và test.
+  \item \texttt{original\_query} được giữ cho hiển thị/history/support lookup.
+  \item \texttt{effective\_query} được dùng cho truy xuất/highlighting.
+  \item Bộ lọc nhập tay override bộ lọc đã parse để điều khiển rõ ràng từ UI vẫn là nguồn quyết định cuối.
+  \item Metadata không được append vào embedding text để tránh làm nhiễu vector nội dung.
+\end{itemize}
+
+Giới hạn cần nói rõ: tìm kiếm metadata ngữ nghĩa hiện là đường đã cài đặt và có đánh giá smoke/protocol,
+nhưng chưa đủ lớn để khẳng định bộ phân tích semantic đạt chất lượng sản phẩm thực tế.
+
+\section{Thời gian chạy theo dataset và lớp giải thích}
+
+Thời gian chạy được thiết kế theo dataset: một API/UI phục vụ nhiều dataset, mỗi dataset có profile riêng
+về index, phương pháp, phương pháp mặc định, model embedding, metric chính và metadata support.
+
+Dạng endpoint:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\ttfamily
+GET  /datasets\\
+GET  /datasets/\{dataset\_id\}/stats\\
+GET  /datasets/\{dataset\_id\}/queries\\
+GET  /datasets/\{dataset\_id\}/benchmarks\\
+GET  /datasets/\{dataset\_id\}/embedding-health\\
+POST /datasets/\{dataset\_id\}/search
+\end{minipage}
+}
+\end{center}
+
+Lớp giải thích gồm:
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.30\textwidth} Y}
+\toprule
+Lớp & Mục đích \\
+\midrule
+Highlight từ khóa truy vấn & Cho thấy kết quả khớp truy vấn ở đoạn nào. \\
+Overlay support & Cho thấy kết quả nào là gold support hit. \\
+Tóm tắt gold support & Cho biết tài liệu hỗ trợ nào tìm được/chưa tìm được. \\
+Chip metadata đã parse & Cho thấy parser hiểu metadata trong truy vấn thế nào. \\
+Chẩn đoán xếp hạng & Cho biết lỗi nằm ở sinh ứng viên hay xếp hạng. \\
+\bottomrule
+\end{tabularx}
+
+\section{Luồng demo đề xuất}
+
+Demo nên minh họa kiến trúc và bằng chứng, không đi theo sprint.
+
+\begin{enumerate}
+  \item Mở dashboard, chỉ selector dataset.
+  \item Chọn HotpotQA.
+  \item Chạy một truy vấn bằng \method{tv\_hybrid} hoặc \method{tv\_bridge\_title\_entities\_rrf}.
+  \item Chỉ phần tóm tắt Gold Support và badge Support Hit.
+  \item Chỉ các từ khóa truy vấn được highlight trong title/snippet.
+  \item Bật chế độ Semantic Metadata.
+  \item Chạy truy vấn: \texttt{tài liệu về lịch sử Việt Nam của Nguyen An trước 31/01/2024}.
+  \item Chỉ các chip đã parse: Content, Author, Created before.
+  \item Chuyển sang VimQA.
+  \item Mở trang benchmark và giải thích vì sao BM25 là mặc định cho VimQA.
+\end{enumerate}
+
+\section{Khẳng định an toàn, điều không khẳng định và bước tiếp theo}
+
+\subsection{Khẳng định an toàn}
+
+\begin{itemize}
+  \item Hệ thống hỗ trợ truy xuất toàn bộ HotpotQA corpus trên 5,233,329 tài liệu.
+  \item Hệ thống có BM25, TurboVec dense, hybrid RRF, metadata-filtered hybrid và truy xuất bridge-aware.
+  \item \method{tv\_bridge\_title\_entities\_rrf} đạt \metric{full\_support@10}=0.620 trong pilot 200 truy vấn.
+  \item Hệ thống có dataset-first API/UI cho HotpotQA và VimQA.
+  \item Proxy truy xuất VimQA đã được stage và benchmark trên 9,044 truy vấn.
+  \item Đường Parser/API/UI cho semantic metadata đã được cài đặt và bật theo lựa chọn.
+\end{itemize}
+
+\subsection{Điều không khẳng định}
+
+\begin{itemize}
+  \item Không khẳng định benchmark HotpotQA có thể so trực tiếp với paper.
+  \item Không khẳng định chất lượng production cho meeting search.
+  \item Không khẳng định độ trễ môi trường thật.
+  \item Không khẳng định tìm kiếm metadata ngữ nghĩa đã được đánh giá đầy đủ.
+  \item Không khẳng định VimQA là benchmark BEIR-style native.
+\end{itemize}
+
+\subsection{Bước tiếp theo}
+
+\begin{enumerate}
+  \item Chạy benchmark lớn hơn cho truy xuất bridge-aware trên HotpotQA dev/test.
+  \item Tạo benchmark semantic metadata lớn hơn từ metadata tổng hợp.
+  \item Định nghĩa schema metadata thật cho meeting search: speaker, participants, timestamp, meeting title, agenda, action items.
+  \item Gom lại validation command và kiểm tra số lượng artifact.
+  \item Quyết định phương pháp thời gian chạy mặc định sau khi có bằng chứng lớn hơn pilot 200 truy vấn.
+\end{enumerate}
+
+\section{Câu Hỏi Mentor Có Thể Hỏi}
+
+\subsection*{Vì sao dùng TurboVec?}
+
+Vì toàn bộ HotpotQA corpus có 5.23M tài liệu. Elasticsearch rất phù hợp cho BM25 và kho tài liệu,
+nhưng truy xuất dense vector toàn quy mô có thể nặng trên phần cứng local. TurboVec cho phép truy xuất dense
+nén, rồi hydrate kết quả qua Elasticsearch bằng \texttt{numeric\_id}.
+
+\subsection*{Vì sao không chỉ thêm reranker?}
+
+Reranker chỉ giúp nếu tài liệu liên quan đã vào tập ứng viên nhưng bị xếp hạng thấp. Ablation reranker
+top-100 cho thấy net full-support win bằng 0 trên pilot 200 truy vấn. Vì vậy hướng hiệu quả hơn hiện tại
+là cải thiện sinh ứng viên/truy xuất tài liệu hỗ trợ thứ hai.
+
+\subsection*{Metadata có phải metadata thật không?}
+
+Chưa. Metadata của HotpotQA và VimQA hiện là tổng hợp để demo cơ chế truy xuất có nhận biết metadata. Nếu chuyển
+sang meeting search thật, cần schema thật như speaker, participants, timestamp, agenda và action items.
+
+\subsection*{Truy xuất bridge-aware chứng minh điều gì?}
+
+Nó cho thấy lỗi lớn của truy xuất đa bước không chỉ nằm ở xếp hạng. Khi phương pháp biết khai thác tín hiệu title/entity
+để tìm tài liệu hỗ trợ thứ hai, \metric{full\_support@10} tăng từ 0.545 lên 0.620 trong pilot.
+
+\appendix
+\section{Phụ lục cấu hình}
+
+Phụ lục này ghi các cấu hình đủ để mentor đối chiếu cách hệ thống đang chạy và cách các số trong báo cáo được sinh ra.
+Đây là cấu hình project/runtime hiện tại, không phải cấu hình production.
+
+\subsection{Hồ sơ dataset trong runtime}
+
+\small
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.18\textwidth} Y Y}
+\toprule
+Mục & HotpotQA & VimQA \\
+\midrule
+Dataset id & \texttt{beir/hotpotqa/dev} & \texttt{vimqa/all} \\
+Index runtime & \texttt{hotpotqa\_full\_bm25\_current} & \texttt{vimqa\_all\_dense\_bkai\_current} \\
+Phương pháp & \texttt{es\_bm25}, \texttt{tv\_dense}, \texttt{tv\_hybrid}, \texttt{tv\_filtered\_hybrid} & \texttt{es\_bm25}, \texttt{es\_dense}, \texttt{es\_hybrid} \\
+Mặc định & \texttt{tv\_hybrid} & \texttt{es\_bm25} \\
+Backend dense & \texttt{turbovec} & \texttt{elasticsearch\_dense\_vector} \\
+Model embedding & \texttt{BAAI/bge-small-en-v1.5} & \texttt{bkai-foundation-models/vietnamese-bi-encoder} \\
+Số chiều vector & 384 & 768 \\
+Metric chính & \texttt{full\_support\_recall@10} & \texttt{recall@10} \\
+Metadata filter & Có & Có trong profile hiện tại \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+\subsection{Cấu hình ingest và artifact}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.30\textwidth} Y}
+\toprule
+Hạng mục & Cấu hình \\
+\midrule
+HotpotQA staging & \texttt{artifacts/hotpotqa\_full/staging}, \texttt{docs-per-file=50000}, \texttt{numeric\_id} ổn định. \\
+HotpotQA document count & \texttt{5,233,329} documents; validate bằng \texttt{--expected-count 5233329}. \\
+HotpotQA BM25 index & Index vật lý \texttt{hotpotqa\_full\_bm25\_v1}, alias runtime \texttt{hotpotqa\_full\_bm25\_current}. \\
+HotpotQA ingest batch & \texttt{--batch-size 256}, progress markers trong \texttt{artifacts/hotpotqa\_full/progress}. \\
+TurboVec artifact & \texttt{artifacts/hotpotqa\_full/turbovec/hotpotqa\_bge\_small\_4bit.tvim}. \\
+TurboVec vector config & BGE-small, \texttt{dim=384}, \texttt{bit\_width=4}. \\
+VimQA staging & \texttt{artifacts/vimqa/all/staging/docs-00000.jsonl}, \texttt{3,623} tài liệu. \\
+VimQA queries/qrels & \texttt{evaluation/results/vimqa/vimqa\_queries.tsv} và \texttt{vimqa\_qrels.tsv}, \texttt{9,044} truy vấn. \\
+VimQA index & \texttt{vimqa\_all\_bm25\_current} cho BM25 và \texttt{vimqa\_all\_dense\_bkai\_current} cho dense/hybrid. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Cấu hình retrieval và benchmark}
+
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.26\textwidth} Y}
+\toprule
+Phương pháp & Cấu hình chính \\
+\midrule
+es\_bm25 & Elasticsearch \texttt{multi\_match} trên \texttt{title\^{}2} và \texttt{content}; \texttt{top\_k=10} trong benchmark chính. \\
+tv\_dense & Encode query bằng BGE-small qua embedding service, search TurboVec full index, hydrate tài liệu bằng Elasticsearch qua \texttt{numeric\_id}. \\
+tv\_hybrid & BM25 candidates + TurboVec dense candidates, gộp bằng RRF; benchmark chính dùng \texttt{candidate\_k=100}, \texttt{num\_candidates=100}, \texttt{rrf\_k=30}. \\
+tv\_filtered\_hybrid & BM25/filter tạo allowlist \texttt{numeric\_id}; TurboVec search trong allowlist rồi gộp RRF. Dùng cho metadata/filter path, không phải quality default. \\
+tv\_hybrid\_rerank & Benchmark-only; rerank top-100 candidates bằng \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2}; không expose làm runtime default. \\
+\bridgecell & Sinh truy vấn bước hai từ title/entity/lead-sentence; cấu hình khuyến nghị hiện tại là \texttt{beam1\_terms6}: \texttt{beam\_size=1}, \texttt{max\_bridge\_terms=6}. \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+Các benchmark HotpotQA trong báo cáo dùng cấu hình pilot:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+dataset = beir/hotpotqa/dev\\
+index = hotpotqa\_full\_bm25\_current\\
+top\_k = 10\\
+max\_queries = 200\\
+candidate\_k = 100\\
+num\_candidates = 100\\
+rrf\_k = 30\\
+first\_hop\_k = 5\\
+second\_hop\_k = 10\\
+context\_chars = 256
+\end{minipage}
+}
+\end{center}
+
+Riêng cấu hình bridge tuning tốt nhất hiện tại:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+method = tv\_bridge\_title\_entities\_rrf\\
+config = beam1\_terms6\\
+beam\_size = 1\\
+max\_bridge\_terms = 6\\
+top\_k = 10\\
+candidate\_k = 100\\
+num\_candidates = 100\\
+rrf\_k = 30
+\end{minipage}
+}
+\end{center}
+
+\subsection{Cấu hình runtime, API và cache}
+
+\small
+\begin{tabularx}{\textwidth}{>{\ttfamily\raggedright\arraybackslash}p{0.34\textwidth} Y}
+\toprule
+Biến/endpoint & Giá trị hoặc vai trò \\
+\midrule
+DATASET\_ID & Mặc định \texttt{beir/hotpotqa/dev}. \\
+ELASTICSEARCH\_URL & Mặc định local \texttt{http://localhost:9200}. \\
+ELASTICSEARCH\_INDEX & Local default \texttt{hotpotqa\_docs\_current}; Docker/demo dùng \texttt{hotpotqa\_full\_bm25\_current}. \\
+EMBEDDING\_SERVICE\_URL & Docker/demo dùng \texttt{http://host.docker.internal:8010/embed}. \\
+EMBEDDING\_TIMEOUT\_SECONDS & \texttt{30}. \\
+REDIS\_URL & Docker dùng \texttt{redis://redis:6379/0}. \\
+SEARCH\_CACHE\_TTL\_SECONDS & Mặc định \texttt{300}; demo warm cache có thể dùng \texttt{86400}. \\
+TURBOVEC\_INDEX\_PATH & Trong container: \texttt{/app/artifacts/hotpotqa\_full/turbovec/}\newline \texttt{hotpotqa\_bge\_small\_4bit.tvim}. \\
+DEFAULT\_SEARCH\_METHOD & \texttt{tv\_hybrid}. \\
+\bottomrule
+\end{tabularx}
+\normalsize
+
+Các endpoint dataset-first chính:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+GET  /datasets\\
+GET  /datasets/\{dataset\_id\}/stats\\
+GET  /datasets/\{dataset\_id\}/queries\\
+GET  /datasets/\{dataset\_id\}/benchmarks\\
+GET  /datasets/\{dataset\_id\}/embedding-health\\
+POST /datasets/\{dataset\_id\}/search
+\end{minipage}
+}
+\end{center}
+
+\subsection{Cấu hình semantic metadata}
+
+\begin{tabularx}{\textwidth}{>{\bfseries}p{0.30\textwidth} Y}
+\toprule
+Mục & Cấu hình/ý nghĩa \\
+\midrule
+Cờ bật parser & \texttt{semantic\_metadata=true}; nếu không bật, query đi theo đường retrieval bình thường. \\
+Parser & Rule-based deterministic parser để tách \texttt{effective\_query} và \texttt{metadata\_filters}. \\
+Trường filter hiện có & \texttt{author}, \texttt{created\_at}, \texttt{modified\_at}. \\
+Ưu tiên filter & Filter nhập tay từ UI override filter parser sinh ra. \\
+Embedding text & Không append metadata vào embedding text; vector chỉ biểu diễn content để tránh nhiễu semantic search. \\
+Đường retrieval khi có metadata & \texttt{tv\_hybrid} có filter được route sang \texttt{tv\_filtered\_hybrid}; filter được xem là hard constraint. \\
+\bottomrule
+\end{tabularx}
+
+\subsection{Lệnh reproduce tối thiểu}
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+python scripts/stage\_hotpotqa.py --dataset beir/hotpotqa --output-dir artifacts/hotpotqa\_full/staging --docs-per-file 50000\\
+python scripts/es\_hotpotqa.py create-index --index hotpotqa\_full\_bm25\_v1 --alias hotpotqa\_full\_bm25\_current --reset\\
+python scripts/es\_hotpotqa.py ingest --index hotpotqa\_full\_bm25\_v1 --staging-dir artifacts/hotpotqa\_full/staging --progress-dir artifacts/hotpotqa\_full/progress --batch-size 256\\
+python scripts/es\_hotpotqa.py validate --index hotpotqa\_full\_bm25\_current --expected-count 5233329
+\end{minipage}
+}
+\end{center}
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+python -m src.evaluation.benchmark\_es --dataset beir/hotpotqa/dev --index hotpotqa\_full\_bm25\_current --methods es\_bm25,tv\_dense,tv\_hybrid --top-k 10 --max-queries 200 --candidate-k 100 --num-candidates 100 --rrf-k 30 --output evaluation/results/hotpotqa\_full/tv\_full\_200.json --run-dir evaluation/runs/hotpotqa\_full
+\end{minipage}
+}
+\end{center}
+
+\subsection{Cấu hình render báo cáo}
+
+Báo cáo được render bằng MiKTeX/XeLaTeX để hỗ trợ tiếng Việt có dấu:
+
+\begin{center}
+\fcolorbox{vdtline}{vdtgray}{
+\begin{minipage}{0.92\textwidth}
+\footnotesize\ttfamily
+latexmk -pvc -view=none -xelatex -interaction=nonstopmode -halt-on-error mentor-report.tex
+\end{minipage}
+}
+\end{center}
+
+\end{document}

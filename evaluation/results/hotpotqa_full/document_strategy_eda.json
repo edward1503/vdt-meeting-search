@@ -1,0 +1,229 @@
+{
+  "sample_design": {
+    "source": "artifacts\\hotpotqa_full\\staging",
+    "files_total": 105,
+    "files_sampled": 105,
+    "docs_per_file_sampled": 5000,
+    "docs_iterated": 525000,
+    "full_docs": 5233329,
+    "sampling_note": "first N rows from every staging shard, spreading the sample across all shard files"
+  },
+  "document_lengths": {
+    "title_tokens": {
+      "min": 0,
+      "p50": 3,
+      "p75": 4,
+      "p90": 5,
+      "p95": 6,
+      "p99": 9,
+      "max": 27,
+      "avg": 3.021
+    },
+    "text_tokens": {
+      "min": 0,
+      "p50": 36,
+      "p75": 59,
+      "p90": 87,
+      "p95": 108,
+      "p99": 157,
+      "max": 633,
+      "avg": 44.582
+    },
+    "content_tokens": {
+      "min": 1,
+      "p50": 39,
+      "p75": 62,
+      "p90": 90,
+      "p95": 111,
+      "p99": 160,
+      "max": 636,
+      "avg": 47.603
+    },
+    "content_chars": {
+      "min": 11,
+      "p50": 238,
+      "p75": 372,
+      "p90": 545,
+      "p95": 671,
+      "p99": 969,
+      "max": 3706,
+      "avg": 289.097
+    },
+    "source_bytes": {
+      "min": 151,
+      "p50": 842,
+      "p75": 1246,
+      "p90": 1766,
+      "p95": 2147,
+      "p99": 3045,
+      "max": 11294,
+      "avg": 994.984
+    },
+    "sentence_count_per_doc": {
+      "min": 0,
+      "p50": 2,
+      "p75": 3,
+      "p90": 5,
+      "p95": 6,
+      "p99": 8,
+      "max": 36,
+      "avg": 2.478
+    },
+    "sentence_tokens_sample": {
+      "min": 0,
+      "p50": 16,
+      "p75": 23,
+      "p90": 30,
+      "p95": 36,
+      "p99": 49,
+      "max": 394,
+      "avg": 17.996
+    }
+  },
+  "quality_flags": {
+    "missing": {
+      "url": 525000,
+      "text": 29
+    },
+    "duplicate_doc_ids_in_sample": 0,
+    "duplicate_content_hashes_in_sample": 0
+  },
+  "passage_estimates": {
+    "avg_windows_per_doc": {
+      "80_tokens_stride_40": 1.188,
+      "120_tokens_stride_60": 1.043,
+      "160_tokens_stride_80": 1.011
+    },
+    "estimated_full_passages": {
+      "80_tokens_stride_40": 6217195,
+      "120_tokens_stride_60": 5458362,
+      "160_tokens_stride_80": 5290896
+    }
+  },
+  "split_counts": {
+    "beir/hotpotqa/train": {
+      "queries": 85000,
+      "qrels": 170000,
+      "qrels_per_query": 2.0
+    },
+    "beir/hotpotqa/dev": {
+      "queries": 5447,
+      "qrels": 10894,
+      "qrels_per_query": 2.0
+    },
+    "beir/hotpotqa/test": {
+      "queries": 7405,
+      "qrels": 14810,
+      "qrels_per_query": 2.0
+    }
+  },
+  "samples": [
+    {
+      "doc_id": "12",
+      "title": "Anarchism",
+      "content_tokens": 48,
+      "sentence_count": 3,
+      "preview": "Anarchism Anarchism is a political philosophy that advocates self-governed societies based on voluntary institutions. These are often described as stateless societies, although several authors have defined them more spec"
+    },
+    {
+      "doc_id": "25",
+      "title": "Autism",
+      "content_tokens": 72,
+      "sentence_count": 4,
+      "preview": "Autism Autism is a neurodevelopmental disorder characterized by impaired social interaction, impaired verbal and non-verbal communication, and restricted and repetitive behavior. Parents usually notice signs in the first"
+    },
+    {
+      "doc_id": "39",
+      "title": "Albedo",
+      "content_tokens": 48,
+      "sentence_count": 2,
+      "preview": "Albedo Albedo ( ) is a measure for reflectance or optical brightness (Latin \"albedo,\" \"whiteness\") of a surface. It is dimensionless and measured on a scale from zero (corresponding to a black body that absorbs all incid"
+    },
+    {
+      "doc_id": "290",
+      "title": "A",
+      "content_tokens": 105,
+      "sentence_count": 5,
+      "preview": "A A (named , plural \"As\", \"A's\", \"a\"s, \"a's\" or \"aes\" ) is the first letter and the first vowel of the ISO basic Latin alphabet. It is similar to the Ancient Greek letter alpha, from which it derives. The upper-case vers"
+    },
+    {
+      "doc_id": "303",
+      "title": "Alabama",
+      "content_tokens": 73,
+      "sentence_count": 5,
+      "preview": "Alabama Alabama ( ) is a state in the southeastern region of the United States. It is bordered by Tennessee to the north, Georgia to the east, Florida and the Gulf of Mexico to the south, and Mississippi to the west. Ala"
+    }
+  ],
+  "longest_docs": [
+    {
+      "doc_id": "25093464",
+      "title": "Robert Boyer (chemist)",
+      "content_tokens": 636,
+      "sentence_count": 31,
+      "preview": "Robert Boyer (chemist) Robert Allen Boyer (September 30, 1909 in Toledo, Ohio – November 11, 1989 in Dunedin, Florida) was a chemist employed by Henry Ford, he was extremely proficient at inventing ways to convert soybea"
+    },
+    {
+      "doc_id": "45186921",
+      "title": "Alembic (magazine)",
+      "content_tokens": 611,
+      "sentence_count": 28,
+      "preview": "Alembic (magazine) Alembic was a poetry magazine established by Peter Barry, Ken Edwards, and Robert Gavin Hampson, which appeared eight times during the 1970s. The first issue appeared in 1973: it was a collection of po"
+    },
+    {
+      "doc_id": "41739353",
+      "title": "The Royal Bengal Tiger (film)",
+      "content_tokens": 593,
+      "sentence_count": 18,
+      "preview": "The Royal Bengal Tiger (film) Abhi (Abir Chatterjee) is a typical meek & docile Bengali familyman and doesn't know how to protest. He lives in Kolkata with his wife Apu (Priyanka Sarkar) and his son. He has a tenant who "
+    },
+    {
+      "doc_id": "54116968",
+      "title": "Otto van Rees (artist)",
+      "content_tokens": 535,
+      "sentence_count": 29,
+      "preview": "Otto van Rees (artist) The Dutch artist Otto van Rees (1884-1957), son of a family of academics, started his career in Paris, where he moved in 1904. By intermediation of Picasso, whom Van Rees met in the café Le Lapin A"
+    },
+    {
+      "doc_id": "23019954",
+      "title": "Mental Overdrive",
+      "content_tokens": 527,
+      "sentence_count": 20,
+      "preview": "Mental Overdrive Mental Overdrive is the primary solo moniker of Per Martinsen (born 31 July 1966), one of Norway's most prolific and influential techno musicians. His tracks have ranged from hardcore rave techno to vibr"
+    },
+    {
+      "doc_id": "21913885",
+      "title": "Scotch Village, Nova Scotia",
+      "content_tokens": 515,
+      "sentence_count": 26,
+      "preview": "Scotch Village, Nova Scotia Mi’kmaq and their ancestors have been in the Bay of Fundy area over 10,000 years, long before Egyptians built pyramids or European agriculture began. They traded with Europeans for centuries, "
+    },
+    {
+      "doc_id": "39534406",
+      "title": "Strid (band)",
+      "content_tokens": 512,
+      "sentence_count": 23,
+      "preview": "Strid (band) Strid is a Norwegian black metal band that was originally known as \"Malfeitor\" from 1991 to 1992. After releasing two demos - \"Malfeitor\" (in 1991) and \"Pandemonium\" (in 1992), they changed their name to \"Ba"
+    },
+    {
+      "doc_id": "28029609",
+      "title": "Robinson Ekspeditionen 2009",
+      "content_tokens": 507,
+      "sentence_count": 26,
+      "preview": "Robinson Ekspeditionen 2009 Robinson Ekspeditionen 2009 was the twelfth season of the Danish version of the Swedish show Expedition Robinson. This season premiered on September 31, 2009 and aired until November 23, 2009."
+    },
+    {
+      "doc_id": "31799559",
+      "title": "2011–12 Derby County F.C. season",
+      "content_tokens": 465,
+      "sentence_count": 13,
+      "preview": "2011–12 Derby County F.C. season The 2011–12 season was Derby County's 106th season in the Football League and their 113th overall in league football. It was their fourth consecutive season in the second tier following t"
+    },
+    {
+      "doc_id": "31251773",
+      "title": "List of Colchester United F.C. seasons",
+      "content_tokens": 461,
+      "sentence_count": 20,
+      "preview": "List of Colchester United F.C. seasons Colchester United Football Club is an English professional football club based in Colchester, Essex, that was founded in 1937. The club went on to compete in the Southern Football L"
+    }
+  ]
+}

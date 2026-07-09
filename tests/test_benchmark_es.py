@@ -130,6 +130,9 @@ def test_map_es_method_strips_prefix():
     assert map_es_method('es_hybrid') == 'hybrid'
     assert map_es_method('es_iterative_hybrid') == 'iterative_hybrid'
 
+def test_map_es_method_accepts_title_aware_bm25():
+    assert map_es_method("es_bm25_title") == "bm25_title"
+
 def test_iterative_variant_method_mapping():
     assert map_es_method('es_iterative_title') == 'iterative_title'
     assert map_es_method('es_iterative_sentence') == 'iterative_sentence'
@@ -381,3 +384,162 @@ def test_run_benchmark_dispatches_tv_two_hop_bridge_rrf(monkeypatch, tmp_path):
     assert result["config"]["beam_size"] == 2
     assert result["config"]["max_bridge_terms"] == 6
     assert result["results"][0]["metrics"]["chain_recall@1"] == 1.0
+
+def test_run_benchmark_dispatches_tv_bridge_title_entities_rrf(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeDataset:
+        def queries_iter(self):
+            yield SimpleNamespace(query_id="q1", text="query")
+
+        def qrels_iter(self):
+            yield SimpleNamespace(query_id="q1", doc_id="d1", relevance=1)
+
+    class FakeRetriever:
+        def search_bridge_title_entities_rrf(self, query, top_k, hop1_top_k, hop2_top_k, beam_size, max_bridge_terms, candidate_k, rrf_k):
+            calls.append(
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "hop1_top_k": hop1_top_k,
+                    "hop2_top_k": hop2_top_k,
+                    "beam_size": beam_size,
+                    "max_bridge_terms": max_bridge_terms,
+                    "candidate_k": candidate_k,
+                    "rrf_k": rrf_k,
+                }
+            )
+            return [{"doc_id": "d1", "score": 1.0, "chain_rank": 1, "chain_doc_ids": ["d1"], "hop": 1}]
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: FakeDataset())
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["tv_bridge_title_entities_rrf"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=20,
+        rrf_k=7,
+        first_hop_k=3,
+        second_hop_k=4,
+        context_chars=128,
+        run_dir=tmp_path,
+        beam_size=2,
+        max_bridge_terms=6,
+    )
+
+    assert calls == [
+        {
+            "query": "query",
+            "top_k": 10,
+            "hop1_top_k": 3,
+            "hop2_top_k": 4,
+            "beam_size": 2,
+            "max_bridge_terms": 6,
+            "candidate_k": 20,
+            "rrf_k": 7,
+        }
+    ]
+    assert result["results"][0]["metrics"]["full_support_recall@10"] == 1.0
+
+def test_run_benchmark_dispatches_title_aware_bm25(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeDataset:
+        def queries_iter(self):
+            yield SimpleNamespace(query_id="q1", text="query")
+
+        def qrels_iter(self):
+            yield SimpleNamespace(query_id="q1", doc_id="d1", relevance=1)
+
+    class FakeRetriever:
+        def search(self, query, method, top_k, candidate_k=100, rrf_k=60):
+            calls.append(method)
+            return [{"doc_id": "d1", "score": 1.0}]
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: FakeDataset())
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["es_bm25_title"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=20,
+        rrf_k=7,
+        first_hop_k=5,
+        second_hop_k=10,
+        context_chars=256,
+        run_dir=tmp_path,
+    )
+
+    assert calls == ["bm25_title"]
+    assert result["results"][0]["metrics"]["full_support_recall@10"] == 1.0
+
+def test_method_mapping_accepts_tv_hybrid_rerank():
+    assert benchmark_es.classify_method("tv_hybrid_rerank") == "turbovec"
+
+def test_run_benchmark_dispatches_tv_hybrid_rerank_and_records_model(monkeypatch, tmp_path):
+    calls = []
+
+    class FakeDataset:
+        def queries_iter(self):
+            yield SimpleNamespace(query_id="q1", text="query")
+
+        def qrels_iter(self):
+            yield SimpleNamespace(query_id="q1", doc_id="d1", relevance=1)
+
+    class FakeRetriever:
+        def search_hybrid_rerank(self, query, top_k, candidate_k, rrf_k, reranker_model):
+            calls.append(
+                {
+                    "query": query,
+                    "top_k": top_k,
+                    "candidate_k": candidate_k,
+                    "rrf_k": rrf_k,
+                    "reranker_model": reranker_model,
+                }
+            )
+            return [{"doc_id": "d1", "score": 2.0, "source": "bm25+dense+rerank"}]
+
+    monkeypatch.setattr(benchmark_es, "_load_ir_dataset", lambda dataset_id: FakeDataset())
+    monkeypatch.setattr(benchmark_es, "build_retriever", lambda *args, **kwargs: FakeRetriever())
+
+    result = benchmark_es.run_benchmark(
+        dataset_id="dataset",
+        index="idx",
+        methods=["tv_hybrid_rerank"],
+        top_k=10,
+        max_queries=None,
+        url="http://localhost:9200",
+        model_name="model",
+        num_candidates=100,
+        candidate_k=25,
+        rrf_k=30,
+        first_hop_k=5,
+        second_hop_k=10,
+        context_chars=256,
+        run_dir=tmp_path,
+        reranker_model="fake-reranker",
+    )
+
+    assert calls == [
+        {
+            "query": "query",
+            "top_k": 10,
+            "candidate_k": 25,
+            "rrf_k": 30,
+            "reranker_model": "fake-reranker",
+        }
+    ]
+    assert result["config"]["reranker_model"] == "fake-reranker"
+    assert result["results"][0]["metrics"]["full_support_recall@10"] == 1.0

@@ -1,0 +1,26 @@
+[
+  {
+    "query_id": "smq_000000",
+    "query": "find documents about Anarchism by Nguyen An before 2024-01-10",
+    "content_query": "Anarchism",
+    "metadata_filters": {
+      "author": "Nguyen An",
+      "created_at_to": "2024-01-10"
+    },
+    "relevant_doc_ids": [
+      "semantic_smoke_1"
+    ]
+  },
+  {
+    "query_id": "smq_000001",
+    "query": "find documents about Ozone by Tran Binh before 2024-02-10",
+    "content_query": "Ozone",
+    "metadata_filters": {
+      "author": "Tran Binh",
+      "created_at_to": "2024-02-10"
+    },
+    "relevant_doc_ids": [
+      "semantic_smoke_2"
+    ]
+  }
+]

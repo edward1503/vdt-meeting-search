@@ -1,0 +1,49 @@
+{
+  "config": {
+    "dataset_id": "beir/hotpotqa/dev",
+    "index": "hotpotqa_full_bm25_current",
+    "methods": [
+      "tv_bridge_title_entities_rrf"
+    ],
+    "top_k": 10,
+    "max_queries": 200,
+    "model_name": "BAAI/bge-small-en-v1.5",
+    "num_candidates": 100,
+    "candidate_k": 100,
+    "queries": 200,
+    "rrf_k": 30,
+    "first_hop_k": 5,
+    "second_hop_k": 10,
+    "hop1_top_k": 5,
+    "hop2_top_k": 10,
+    "context_chars": 256,
+    "beam_size": 1,
+    "max_bridge_terms": 6,
+    "reranker_model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "query_file": null,
+    "qrels_file": null
+  },
+  "results": [
+    {
+      "method": "tv_bridge_title_entities_rrf",
+      "metrics": {
+        "precision@10": 0.1555,
+        "recall@10": 0.7775,
+        "mrr@10": 0.853,
+        "ndcg@10": 0.7382,
+        "latency_p50_ms": 742.6893,
+        "latency_p95_ms": 1224.9911,
+        "latency_p99_ms": 1555.2854,
+        "qps": 1.1034,
+        "queries": 200,
+        "full_support_recall@2": 0.3,
+        "full_support_recall@5": 0.555,
+        "full_support_recall@10": 0.62,
+        "chain_recall@1": 0.3,
+        "chain_recall@5": 0.55,
+        "chain_mrr": 0.4084
+      },
+      "run_file": "evaluation\\runs\\hotpotqa_full\\bridge_title_entities_tuning\\beam1_terms6\\tv_bridge_title_entities_rrf_beir_hotpotqa_dev_top10.trec"
+    }
+  ]
+}

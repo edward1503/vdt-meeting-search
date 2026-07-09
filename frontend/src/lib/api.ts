@@ -27,6 +27,16 @@ export interface SearchFilters {
   modified_at_to?: string;
 }
 
+export interface ParsedMetadataQuery {
+  original_query: string;
+  content_query: string;
+  metadata_filters: SearchFilters;
+  parsed_chips: string[];
+  parsed: boolean;
+  parser: string;
+  warnings: string[];
+}
+
 export interface SearchSupportSummary {
   available: boolean;
   support_doc_ids: string[];
@@ -37,10 +47,21 @@ export interface SearchSupportSummary {
   recall_at_k: number | null;
 }
 
+export interface RetrievalTraceStep {
+  step: string;
+  label: string;
+  status: 'completed' | 'running' | 'pending' | 'skipped';
+  elapsed_ms: number | null;
+  summary: string;
+}
+
 export interface SearchResponse {
   dataset_id?: string;
   query_id?: string | null;
   query: string;
+  effective_query?: string;
+  semantic_metadata?: boolean;
+  parsed_query?: ParsedMetadataQuery | null;
   method: string;
   requested_method?: string;
   top_k: number;
@@ -48,6 +69,7 @@ export interface SearchResponse {
   metadata_filters?: SearchFilters;
   metadata_filter_scope?: 'hard_prefilter';
   support?: SearchSupportSummary;
+  retrieval_trace?: RetrievalTraceStep[];
   results: SearchResult[];
 }
 
@@ -256,15 +278,15 @@ function mapBenchmarkSection(section: ApiBenchmarkSection, fallbackTitle: string
   };
 }
 
-export async function searchDataset(datasetId: string, query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}): Promise<SearchResponse> {
+export async function searchDataset(datasetId: string, query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}, semanticMetadata = false): Promise<SearchResponse> {
   return apiFetch(`/datasets/${encodeURIComponent(datasetId)}/search`, {
     method: 'POST',
-    body: JSON.stringify({ query_id: queryId, query, method, top_k: topK, ...filters }),
+    body: JSON.stringify({ query_id: queryId, query, method, top_k: topK, semantic_metadata: semanticMetadata, ...filters }),
   });
 }
 
-export async function searchHotpotQA(query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}): Promise<SearchResponse> {
-  return searchDataset('hotpotqa', query, method, topK, queryId, filters);
+export async function searchHotpotQA(query: string, method: string, topK: number, queryId?: string, filters: SearchFilters = {}, semanticMetadata = false): Promise<SearchResponse> {
+  return searchDataset('hotpotqa', query, method, topK, queryId, filters, semanticMetadata);
 }
 
 function methodLabel(method: string): string {

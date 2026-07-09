@@ -14,6 +14,7 @@ from src.retrieval.elasticsearch_retriever import ElasticsearchRetriever
 
 METHOD_MAP = {
     "es_bm25": "bm25",
+    "es_bm25_title": "bm25_title",
     "es_dense": "dense",
     "es_hybrid": "hybrid",
     "es_iterative_hybrid": "iterative_hybrid",
@@ -21,7 +22,15 @@ METHOD_MAP = {
     "es_iterative_sentence": "iterative_sentence",
     "es_iterative_fast": "iterative_fast",
 }
-TURBOVEC_METHODS = {"tv_dense", "tv_hybrid", "tv_filtered_hybrid", "tv_two_hop_bridge_rrf"}
+TURBOVEC_METHODS = {
+    "tv_dense",
+    "tv_hybrid",
+    "tv_filtered_hybrid",
+    "tv_two_hop_bridge_rrf",
+    "tv_bridge_title_entities_rrf",
+    "tv_hybrid_rerank",
+}
+DEFAULT_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
 ITERATIVE_MODES = {
     "iterative_hybrid": "context",
     "iterative_title": "title",
@@ -91,6 +100,7 @@ def run_benchmark(
     run_dir: Path,
     beam_size: int = 3,
     max_bridge_terms: int = 8,
+    reranker_model: str = DEFAULT_RERANKER_MODEL,
     query_file: Path | None = None,
     qrels_file: Path | None = None,
 ) -> dict[str, Any]:
@@ -137,6 +147,7 @@ def run_benchmark(
                 num_candidates=num_candidates,
                 beam_size=beam_size,
                 max_bridge_terms=max_bridge_terms,
+                reranker_model=reranker_model,
             )
             latencies[query_id] = (time.perf_counter() - start) * 1000
             hits = [
@@ -179,6 +190,7 @@ def run_benchmark(
             "context_chars": context_chars,
             "beam_size": beam_size,
             "max_bridge_terms": max_bridge_terms,
+            "reranker_model": reranker_model,
             "query_file": str(query_file) if query_file else None,
             "qrels_file": str(qrels_file) if qrels_file else None,
         },
@@ -200,10 +212,30 @@ def _search_method(
     num_candidates: int,
     beam_size: int,
     max_bridge_terms: int,
+    reranker_model: str,
 ) -> list[dict[str, Any]]:
     if classify_method(method) == "turbovec":
+        if method == "tv_hybrid_rerank":
+            return retriever.search_hybrid_rerank(
+                query_text,
+                top_k,
+                candidate_k=candidate_k,
+                rrf_k=rrf_k,
+                reranker_model=reranker_model,
+            )
         if method == "tv_two_hop_bridge_rrf":
             return retriever.search_two_hop_bridge_rrf(
+                query_text,
+                top_k,
+                hop1_top_k=first_hop_k,
+                hop2_top_k=second_hop_k,
+                beam_size=beam_size,
+                max_bridge_terms=max_bridge_terms,
+                candidate_k=candidate_k,
+                rrf_k=rrf_k,
+            )
+        if method == "tv_bridge_title_entities_rrf":
+            return retriever.search_bridge_title_entities_rrf(
                 query_text,
                 top_k,
                 hop1_top_k=first_hop_k,
@@ -268,6 +300,7 @@ def main() -> None:
     parser.add_argument("--context-chars", type=int, default=settings.multihop_context_chars)
     parser.add_argument("--beam-size", type=int, default=3)
     parser.add_argument("--max-bridge-terms", type=int, default=8)
+    parser.add_argument("--reranker-model", default=DEFAULT_RERANKER_MODEL)
     args = parser.parse_args()
 
     methods = [method.strip() for method in args.methods.split(",") if method.strip()]
@@ -288,6 +321,7 @@ def main() -> None:
         run_dir=args.run_dir,
         beam_size=args.beam_size,
         max_bridge_terms=args.max_bridge_terms,
+        reranker_model=args.reranker_model,
         query_file=args.query_file,
         qrels_file=args.qrels_file,
     )
